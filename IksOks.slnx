@@ -1,2 +1,5 @@
 <Solution>
+  <Folder Name="/src/">
+    <Project Path="src/IksOks.Web/IksOks.Web.csproj" />
+  </Folder>
 </Solution>
