@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "targets": {
     "net9.0": {}
   },
@@ -8,23 +8,23 @@
     "net9.0": []
   },
   "packageFolders": {
-    "C:\\Users\\Milos\\.nuget\\packages\\": {},
+    "C:\\Users\\veljk\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Milos\\Desktop\\IksOks\\src\\IksOks.Web\\IksOks.Web.csproj",
+      "projectUniqueName": "E:\\ELFAK\\CetvrtaGodina\\VIIsemestar\\AIPS\\IksOks\\IksOks-dev\\src\\IksOks.Web\\IksOks.Web.csproj",
       "projectName": "IksOks.Web",
-      "projectPath": "C:\\Users\\Milos\\Desktop\\IksOks\\src\\IksOks.Web\\IksOks.Web.csproj",
-      "packagesPath": "C:\\Users\\Milos\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Milos\\Desktop\\IksOks\\src\\IksOks.Web\\obj\\",
+      "projectPath": "E:\\ELFAK\\CetvrtaGodina\\VIIsemestar\\AIPS\\IksOks\\IksOks-dev\\src\\IksOks.Web\\IksOks.Web.csproj",
+      "packagesPath": "C:\\Users\\veljk\\.nuget\\packages\\",
+      "outputPath": "E:\\ELFAK\\CetvrtaGodina\\VIIsemestar\\AIPS\\IksOks\\IksOks-dev\\src\\IksOks.Web\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
       ],
       "configFilePaths": [
-        "C:\\Users\\Milos\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\veljk\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
@@ -37,6 +37,7 @@
       },
       "frameworks": {
         "net9.0": {
+          "framework": "net9.0",
           "targetAlias": "net9.0",
           "projectReferences": {}
         }
@@ -51,10 +52,11 @@
         "auditLevel": "low",
         "auditMode": "direct"
       },
-      "SdkAnalysisLevel": "9.0.300"
+      "SdkAnalysisLevel": "10.0.400"
     },
     "frameworks": {
       "net9.0": {
+        "framework": "net9.0",
         "targetAlias": "net9.0",
         "imports": [
           "net461",
@@ -75,7 +77,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.313/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.400/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
