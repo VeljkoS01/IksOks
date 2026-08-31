@@ -1,0 +1,73 @@
+﻿<!DOCTYPE html>
+<html lang="sr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>IksOks</title>
+
+    <link rel="stylesheet" href="/css/site.css">
+</head>
+
+<body>
+    <main class="auth-page">
+        <section class="auth-card">
+            <h1>IksOks</h1>
+            <p class="subtitle">
+                Prijavi se ili napravi novi nalog.
+            </p>
+
+            <div class="auth-tabs">
+                <button id="login-tab"
+                        class="tab-button active"
+                        type="button">
+                    Prijava
+                </button>
+
+                <button id="register-tab"
+                        class="tab-button"
+                        type="button">
+                    Registracija
+                </button>
+            </div>
+
+            <form id="auth-form">
+                <div class="form-field">
+                    <label for="username">
+                        Korisničko ime
+                    </label>
+
+                    <input id="username"
+                           name="username"
+                           type="text"
+                           autocomplete="username"
+                           required>
+                </div>
+
+                <div class="form-field">
+                    <label for="password">
+                        Lozinka
+                    </label>
+
+                    <input id="password"
+                           name="password"
+                           type="password"
+                           autocomplete="current-password"
+                           required>
+                </div>
+
+                <button id="submit-button"
+                        class="primary-button"
+                        type="submit">
+                    Uloguj se
+                </button>
+            </form>
+
+            <p id="message"
+               class="message"
+               aria-live="polite">
+            </p>
+        </section>
+    </main>
+</body>
+</html>
