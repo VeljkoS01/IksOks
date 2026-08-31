@@ -11,6 +11,7 @@ public sealed class IksOksDbContext : DbContext
     }
 
     public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<GameMatch> Matches => Set<GameMatch>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -37,5 +38,36 @@ public sealed class IksOksDbContext : DbContext
 
         user.Property(x => x.CreatedAt)
             .IsRequired();
+
+
+        var match = modelBuilder.Entity<GameMatch>();
+
+        match.ToTable("Matches");
+
+        match.HasKey(x => x.Id);
+
+        match.Property(x => x.BoardSize)
+            .IsRequired();
+
+        match.Property(x => x.WinLength)
+            .IsRequired();
+
+        match.Property(x => x.Status)
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired();
+
+        match.Property(x => x.CreatedAt)
+            .IsRequired();
+
+        match.HasOne(x => x.OwnerUser)
+            .WithMany()
+            .HasForeignKey(x => x.OwnerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        match.HasOne(x => x.OpponentUser)
+            .WithMany()
+            .HasForeignKey(x => x.OpponentUserId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }
