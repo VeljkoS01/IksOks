@@ -27,3 +27,6 @@ Thumbs.db
 # Build artifacts
 publish/
 artifacts/
+
+# Local authentication test files
+cookies.txt
