@@ -58,5 +58,6 @@ app.MapGet("/api/health", () =>
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapAuthEndpoints();
+app.MapMatchEndpoints();
 
 app.Run();
