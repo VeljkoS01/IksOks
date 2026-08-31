@@ -43,6 +43,9 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+app.UseDefaultFiles();
+app.UseStaticFiles();
+
 app.MapGet("/api/health", () =>
 {
     return Results.Ok(new
