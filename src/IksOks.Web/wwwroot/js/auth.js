@@ -5,6 +5,10 @@ const usernameInput = document.querySelector("#username");
 const passwordInput = document.querySelector("#password");
 const submitButton = document.querySelector("#submit-button");
 const message = document.querySelector("#message");
+const authPage = document.querySelector("#auth-page");
+const appPage = document.querySelector("#app-page");
+const welcomeText = document.querySelector("#welcome-text");
+const logoutButton = document.querySelector("#logout-button");
 
 let mode = "login";
 
@@ -109,11 +113,7 @@ async function login(userName, password) {
 
     const user = await response.json();
 
-    showMessage(
-        `Uspešno ste prijavljeni kao ${user.userName}.`,
-        "success");
-
-    authForm.reset();
+    showAuthenticatedUser(user);
 }
 
 async function readError(response) {
@@ -151,7 +151,41 @@ async function checkCurrentUser() {
 
     const user = await response.json();
 
-    showMessage(
-        `Već ste prijavljeni kao ${user.userName}.`,
-        "success");
+    showAuthenticatedUser(user);
 }
+
+function showAuthenticatedUser(user) {
+    authPage.classList.add("hidden");
+    appPage.classList.remove("hidden");
+
+    welcomeText.textContent =
+        `Dobrodošli, ${user.userName}!`;
+
+    clearMessage();
+}
+
+function showAuthPage() {
+    appPage.classList.add("hidden");
+    authPage.classList.remove("hidden");
+
+    welcomeText.textContent = "";
+
+    authForm.reset();
+    setMode("login");
+}
+
+logoutButton.addEventListener("click", async () => {
+    try {
+        const response = await fetch("/api/auth/logout", {
+            method: "POST"
+        });
+
+        if (!response.ok) {
+            return;
+        }
+
+        showAuthPage();
+    } catch {
+        //Ako server nije dostupan, ostavljamo trenutni ekran.
+    }
+});
