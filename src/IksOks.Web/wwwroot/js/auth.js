@@ -9,8 +9,15 @@ const authPage = document.querySelector("#auth-page");
 const appPage = document.querySelector("#app-page");
 const welcomeText = document.querySelector("#welcome-text");
 const logoutButton = document.querySelector("#logout-button");
+const createMatchForm = document.querySelector("#create-match-form");
+const boardSizeInput = document.querySelector("#board-size");
+const winLengthInput = document.querySelector("#win-length");
+const matchMessage = document.querySelector("#match-message");
+const matchesList = document.querySelector("#matches-list");
+const refreshMatchesButton = document.querySelector("#refresh-matches-button");
 
 let mode = "login";
+let currentUser = null;
 
 loginTab.addEventListener("click", () => {
     setMode("login");
@@ -155,6 +162,8 @@ async function checkCurrentUser() {
 }
 
 function showAuthenticatedUser(user) {
+    currentUser = user;
+
     authPage.classList.add("hidden");
     appPage.classList.remove("hidden");
 
@@ -162,9 +171,14 @@ function showAuthenticatedUser(user) {
         `Dobrodošli, ${user.userName}!`;
 
     clearMessage();
+
+    loadMatches();
 }
 
 function showAuthPage() {
+    currentUser = null;
+    matchesList.replaceChildren();
+
     appPage.classList.add("hidden");
     authPage.classList.remove("hidden");
 
@@ -189,3 +203,161 @@ logoutButton.addEventListener("click", async () => {
         //Ako server nije dostupan, ostavljamo trenutni ekran.
     }
 });
+
+boardSizeInput.addEventListener("input", () => {
+    const boardSize = Number(boardSizeInput.value);
+
+    winLengthInput.max = String(boardSize);
+
+    if (Number(winLengthInput.value) > boardSize) {
+        winLengthInput.value = String(boardSize);
+    }
+});
+
+createMatchForm.addEventListener(
+    "submit",
+    async (event) => {
+        event.preventDefault();
+
+        const boardSize = Number(boardSizeInput.value);
+        const winLength = Number(winLengthInput.value);
+
+        const response = await fetch("/api/matches", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                boardSize,
+                winLength
+            })
+        });
+
+        if (!response.ok) {
+            const error = await readError(response);
+
+            showMatchMessage(error, "error");
+            return;
+        }
+
+        showMatchMessage(
+            "Meč je uspešno napravljen.",
+            "success");
+
+        await loadMatches();
+    });
+
+refreshMatchesButton.addEventListener(
+    "click",
+    loadMatches);
+
+async function loadMatches() {
+    try {
+        const response = await fetch("/api/matches");
+
+        if (!response.ok) {
+            return;
+        }
+
+        const matches = await response.json();
+
+        renderMatches(matches);
+    } catch {
+        showMatchMessage(
+            "Nije moguće učitati mečeve.",
+            "error");
+    }
+}
+
+function renderMatches(matches) {
+    matchesList.replaceChildren();
+
+    if (matches.length === 0) {
+        const empty = document.createElement("p");
+
+        empty.className = "empty-state";
+        empty.textContent = "Trenutno nema dostupnih mečeva.";
+
+        matchesList.append(empty);
+        return;
+    }
+
+    for (const match of matches) {
+        const card = document.createElement("article");
+        card.className = "match-card";
+
+        const info = document.createElement("div");
+        info.className = "match-info";
+
+        const owner = document.createElement("span");
+        owner.className = "match-owner";
+        owner.textContent = match.ownerUserName;
+
+        const details = document.createElement("span");
+        details.className = "match-details";
+        details.textContent =
+            `${match.boardSize}×${match.boardSize} · ` +
+            `${match.winLength} za pobedu`;
+
+        info.append(owner, details);
+
+        const button = document.createElement("button");
+        button.className = "secondary-button";
+        button.type = "button";
+
+        const isOwnMatch =
+            currentUser &&
+            match.ownerUserId === currentUser.id;
+
+        if (isOwnMatch) {
+            button.textContent = "Tvoj meč";
+            button.disabled = true;
+        } else {
+            button.textContent = "Pridruži se";
+
+            button.addEventListener("click", () => {
+                joinMatch(match.id);
+            });
+        }
+
+        card.append(info, button);
+        matchesList.append(card);
+    }
+}
+
+async function joinMatch(matchId) {
+    try {
+        const response = await fetch(
+            `/api/matches/${matchId}/join`,
+            {
+                method: "POST"
+            });
+
+        if (!response.ok) {
+            const error = await readError(response);
+
+            showMatchMessage(error, "error");
+
+            await loadMatches();
+            return;
+        }
+
+        const match = await response.json();
+
+        showMatchMessage(
+            `Pridružili ste se meču protiv ` +
+            `${match.ownerUserName}.`,
+            "success");
+
+        await loadMatches();
+    } catch {
+        showMatchMessage(
+            "Nije moguće pridružiti se meču.",
+            "error");
+    }
+}
+
+function showMatchMessage(text, type) {
+    matchMessage.textContent = text;
+    matchMessage.className = `message ${type}`;
+}
