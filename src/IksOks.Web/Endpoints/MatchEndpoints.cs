@@ -18,6 +18,7 @@ public static class MatchEndpoints
 
         group.MapPost("/", CreateMatchAsync);
         group.MapGet("/", GetMatchesAsync);
+        group.MapPost("/{matchId:guid}/join", JoinMatchAsync);
 
         return endpoints;
     }
@@ -107,6 +108,7 @@ public static class MatchEndpoints
         return Results.Ok(matches);
     }
 
+
     private static MatchResponse ToResponse(
         GameMatch match,
         string ownerUserName)
@@ -121,5 +123,109 @@ public static class MatchEndpoints
             match.WinLength,
             match.Status.ToString(),
             match.CreatedAt);
+    }
+
+    private static async Task<IResult> JoinMatchAsync(
+    Guid matchId,
+    ClaimsPrincipal principal,
+    IksOksDbContext db,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(userIdValue, out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var userExists = await db.Users
+            .AnyAsync(
+                user => user.Id == userId,
+                cancellationToken);
+
+        if (!userExists)
+        {
+            return Results.Unauthorized();
+        }
+
+        var matchState = await db.Matches
+            .AsNoTracking()
+            .Where(match => match.Id == matchId)
+            .Select(match => new
+            {
+                match.OwnerUserId,
+                match.OpponentUserId,
+                match.Status
+            })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        if (matchState is null)
+        {
+            return Results.NotFound(new
+            {
+                error = "Match was not found."
+            });
+        }
+
+        if (matchState.OwnerUserId == userId)
+        {
+            return Results.BadRequest(new
+            {
+                error = "You cannot join your own match."
+            });
+        }
+
+        if (matchState.Status != MatchStatus.WaitingForOpponent ||
+            matchState.OpponentUserId is not null)
+        {
+            return Results.Conflict(new
+            {
+                error = "Match is no longer available."
+            });
+        }
+
+        var updatedRows = await db.Matches
+            .Where(match =>
+                match.Id == matchId &&
+                match.Status == MatchStatus.WaitingForOpponent &&
+                match.OpponentUserId == null)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(
+                        match => match.OpponentUserId,
+                        userId)
+                    .SetProperty(
+                        match => match.Status,
+                        MatchStatus.InProgress),
+                cancellationToken);
+
+        if (updatedRows == 0)
+        {
+            return Results.Conflict(new
+            {
+                error = "Match is no longer available."
+            });
+        }
+
+        var response = await db.Matches
+            .AsNoTracking()
+            .Where(match => match.Id == matchId)
+            .Select(match => new MatchResponse(
+                match.Id,
+                match.OwnerUserId,
+                match.OwnerUser.UserName,
+                match.OpponentUserId,
+                match.OpponentUser == null
+                    ? null
+                    : match.OpponentUser.UserName,
+                match.BoardSize,
+                match.WinLength,
+                match.Status.ToString(),
+                match.CreatedAt))
+            .SingleAsync(cancellationToken);
+
+        return Results.Ok(response);
     }
 }
