@@ -4,6 +4,7 @@ using IksOks.Web.Domain.Entities;
 using IksOks.Web.Domain.Enums;
 using IksOks.Web.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using IksOks.Web.Domain.Services;
 
 namespace IksOks.Web.Endpoints;
 
@@ -19,6 +20,8 @@ public static class MatchEndpoints
         group.MapPost("/", CreateMatchAsync);
         group.MapGet("/", GetMatchesAsync);
         group.MapPost("/{matchId:guid}/join", JoinMatchAsync);
+        group.MapGet("/{matchId:guid}", GetMatchAsync);
+        group.MapPost("/{matchId:guid}/moves",MakeMoveAsync);
 
         return endpoints;
     }
@@ -227,5 +230,227 @@ public static class MatchEndpoints
             .SingleAsync(cancellationToken);
 
         return Results.Ok(response);
+    }
+
+    private static async Task<IResult> GetMatchAsync(
+    Guid matchId,
+    IksOksDbContext db,
+    CancellationToken cancellationToken)
+    {
+        var match = await db.Matches
+            .AsNoTracking()
+            .Include(match => match.OwnerUser)
+            .Include(match => match.OpponentUser)
+            .Include(match => match.WinnerUser)
+            .Include(match => match.Moves)
+            .SingleOrDefaultAsync(
+                match => match.Id == matchId,
+                cancellationToken);
+
+        if (match is null)
+        {
+            return Results.NotFound(new
+            {
+                error = "Match was not found."
+            });
+        }
+
+        return Results.Ok(ToDetailsResponse(match));
+    }
+
+    private static async Task<IResult> MakeMoveAsync(
+    Guid matchId,
+    MakeMoveRequest request,
+    ClaimsPrincipal principal,
+    IksOksDbContext db,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(userIdValue, out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        await using var transaction =
+            await db.Database.BeginTransactionAsync(
+                cancellationToken);
+
+        var match = await db.Matches
+            .Include(match => match.Moves)
+            .SingleOrDefaultAsync(
+                match => match.Id == matchId,
+                cancellationToken);
+
+        if (match is null)
+        {
+            return Results.NotFound(new
+            {
+                error = "Match was not found."
+            });
+        }
+
+        if (match.Status != MatchStatus.InProgress ||
+            match.OpponentUserId is null)
+        {
+            return Results.Conflict(new
+            {
+                error = "Match is not in progress."
+            });
+        }
+
+        if (userId != match.OwnerUserId &&
+            userId != match.OpponentUserId)
+        {
+            return Results.Forbid();
+        }
+
+        if (request.Row < 0 ||
+            request.Row >= match.BoardSize ||
+            request.Column < 0 ||
+            request.Column >= match.BoardSize)
+        {
+            return Results.BadRequest(new
+            {
+                error = "Move is outside of the board."
+            });
+        }
+
+        var existingMoves = match.Moves
+            .OrderBy(move => move.MoveNumber)
+            .ToList();
+
+        var occupied = existingMoves.Any(move =>
+            move.Row == request.Row &&
+            move.Column == request.Column);
+
+        if (occupied)
+        {
+            return Results.Conflict(new
+            {
+                error = "Field is already occupied."
+            });
+        }
+
+        var currentTurnUserId =
+            existingMoves.Count % 2 == 0
+                ? match.OwnerUserId
+                : match.OpponentUserId.Value;
+
+        if (currentTurnUserId != userId)
+        {
+            return Results.Conflict(new
+            {
+                error = "It is not your turn."
+            });
+        }
+
+        var symbol =
+            userId == match.OwnerUserId
+                ? "X"
+                : "O";
+
+        var move = new MatchMove
+        {
+            MatchId = match.Id,
+            PlayerUserId = userId,
+            Row = request.Row,
+            Column = request.Column,
+            MoveNumber = existingMoves.Count + 1,
+            Symbol = symbol
+        };
+
+        db.MatchMoves.Add(move);
+
+        var allMoves = existingMoves
+            .Append(move)
+            .ToList();
+
+        if (GameRules.IsWinningMove(
+            allMoves,
+            move,
+            match.WinLength))
+        {
+            match.Status = MatchStatus.Finished;
+            match.WinnerUserId = userId;
+            match.FinishedAt = DateTimeOffset.UtcNow;
+        }
+        else if (allMoves.Count ==
+                 match.BoardSize * match.BoardSize)
+        {
+            match.Status = MatchStatus.Finished;
+            match.WinnerUserId = null;
+            match.FinishedAt = DateTimeOffset.UtcNow;
+        }
+
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateException)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+
+            return Results.Conflict(new
+            {
+                error = "Move could not be completed."
+            });
+        }
+
+        return Results.Ok(
+            new MoveResponse(
+                move.Id,
+                move.PlayerUserId,
+                move.Row,
+                move.Column,
+                move.MoveNumber,
+                move.Symbol,
+                move.CreatedAt));
+    }
+
+    private static MatchDetailsResponse ToDetailsResponse(
+    GameMatch match)
+    {
+        Guid? currentTurnUserId = null;
+
+        if (match.Status == MatchStatus.InProgress &&
+            match.OpponentUserId is not null)
+        {
+            currentTurnUserId =
+                match.Moves.Count % 2 == 0
+                    ? match.OwnerUserId
+                    : match.OpponentUserId;
+        }
+
+        var moves = match.Moves
+            .OrderBy(move => move.MoveNumber)
+            .Select(move => new MoveResponse(
+                move.Id,
+                move.PlayerUserId,
+                move.Row,
+                move.Column,
+                move.MoveNumber,
+                move.Symbol,
+                move.CreatedAt))
+            .ToList();
+
+        return new MatchDetailsResponse(
+            match.Id,
+            match.OwnerUserId,
+            match.OwnerUser.UserName,
+            match.OpponentUserId,
+            match.OpponentUser?.UserName,
+            match.BoardSize,
+            match.WinLength,
+            match.Status.ToString(),
+            currentTurnUserId,
+            match.WinnerUserId,
+            match.WinnerUser?.UserName,
+            match.CreatedAt,
+            match.FinishedAt,
+            moves);
     }
 }
