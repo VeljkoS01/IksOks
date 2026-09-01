@@ -23,4 +23,13 @@ public sealed class GameMatch
 
     public DateTimeOffset CreatedAt { get; set; }
         = DateTimeOffset.UtcNow;
+
+    public Guid? WinnerUserId { get; set; }
+
+    public AppUser? WinnerUser { get; set; }
+
+    public DateTimeOffset? FinishedAt { get; set; }
+
+    public ICollection<MatchMove> Moves { get; set; }
+        = new List<MatchMove>();
 }

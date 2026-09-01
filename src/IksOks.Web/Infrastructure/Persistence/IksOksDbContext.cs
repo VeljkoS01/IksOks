@@ -12,6 +12,7 @@ public sealed class IksOksDbContext : DbContext
 
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<GameMatch> Matches => Set<GameMatch>();
+    public DbSet<MatchMove> MatchMoves => Set<MatchMove>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -68,6 +69,11 @@ public sealed class IksOksDbContext : DbContext
         match.HasOne(x => x.OpponentUser)
             .WithMany()
             .HasForeignKey(x => x.OpponentUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        match.HasOne(x => x.WinnerUser)
+            .WithMany()
+            .HasForeignKey(x => x.WinnerUserId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
