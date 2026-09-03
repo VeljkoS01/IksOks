@@ -15,9 +15,19 @@ const winLengthInput = document.querySelector("#win-length");
 const matchMessage = document.querySelector("#match-message");
 const matchesList = document.querySelector("#matches-list");
 const refreshMatchesButton = document.querySelector("#refresh-matches-button");
+const lobbyView = document.querySelector("#lobby-view");
+const matchView = document.querySelector("#match-view");
+const matchTitle = document.querySelector("#match-title");
+const matchStatus = document.querySelector("#match-status");
+const playerSymbol = document.querySelector("#player-symbol");
+const gameBoard = document.querySelector("#game-board");
+const gameMessage = document.querySelector("#game-message");
+const backToLobbyButton = document.querySelector("#back-to-lobby-button");
 
 let mode = "login";
 let currentUser = null;
+let activeMatchId = null;
+let matchPollingId = null;
 
 loginTab.addEventListener("click", () => {
     setMode("login");
@@ -176,6 +186,8 @@ function showAuthenticatedUser(user) {
 }
 
 function showAuthPage() {
+    stopMatchPolling();
+    activeMatchId = null;
     currentUser = null;
     matchesList.replaceChildren();
 
@@ -240,11 +252,13 @@ createMatchForm.addEventListener(
             return;
         }
 
+        const match = await response.json();
+
         showMatchMessage(
             "Meč je uspešno napravljen.",
             "success");
 
-        await loadMatches();
+        openMatch(match.id);
     });
 
 refreshMatchesButton.addEventListener(
@@ -344,12 +358,8 @@ async function joinMatch(matchId) {
 
         const match = await response.json();
 
-        showMatchMessage(
-            `Pridružili ste se meču protiv ` +
-            `${match.ownerUserName}.`,
-            "success");
+        openMatch(match.id);
 
-        await loadMatches();
     } catch {
         showMatchMessage(
             "Nije moguće pridružiti se meču.",
@@ -360,4 +370,256 @@ async function joinMatch(matchId) {
 function showMatchMessage(text, type) {
     matchMessage.textContent = text;
     matchMessage.className = `message ${type}`;
+}
+
+function openMatch(matchId) {
+    activeMatchId = matchId;
+
+    lobbyView.classList.add("hidden");
+    matchView.classList.remove("hidden");
+
+    backToLobbyButton.classList.add("hidden");
+
+    loadActiveMatch();
+    startMatchPolling();
+}
+
+function startMatchPolling() {
+    stopMatchPolling();
+
+    matchPollingId = window.setInterval(() => {
+        loadActiveMatch();
+    }, 1000);
+}
+
+function stopMatchPolling() {
+    if (matchPollingId === null) {
+        return;
+    }
+
+    window.clearInterval(matchPollingId);
+    matchPollingId = null;
+}
+
+async function loadActiveMatch() {
+    if (!activeMatchId) {
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            `/api/matches/${activeMatchId}`);
+
+        if (!response.ok) {
+            gameMessage.textContent =
+                "Nije moguće učitati meč.";
+
+            return;
+        }
+
+        const match = await response.json();
+
+        renderMatch(match);
+    } catch {
+        gameMessage.textContent =
+            "Server trenutno nije dostupan.";
+    }
+}
+
+function renderMatch(match) {
+    const isOwner =
+        currentUser.id === match.ownerUserId;
+
+    const isOpponent =
+        currentUser.id === match.opponentUserId;
+
+    const mySymbol = isOwner
+        ? "X"
+        : isOpponent
+            ? "O"
+            : "-";
+
+    playerSymbol.textContent = mySymbol;
+
+    const opponentName = isOwner
+        ? match.opponentUserName
+        : match.ownerUserName;
+
+    matchTitle.textContent = opponentName
+        ? `Meč protiv ${opponentName}`
+        : "Čekanje protivnika";
+
+    renderBoard(match);
+
+    updateMatchStatus(match);
+
+    if (match.status === "Finished") {
+        stopMatchPolling();
+
+        backToLobbyButton.classList.remove("hidden");
+    }
+}
+
+function renderBoard(match) {
+    gameBoard.replaceChildren();
+
+    gameBoard.style.gridTemplateColumns =
+        `repeat(${match.boardSize}, 1fr)`;
+
+    const movesByPosition = new Map();
+
+    for (const move of match.moves) {
+        movesByPosition.set(
+            `${move.row}:${move.column}`,
+            move);
+    }
+
+    const isMyTurn =
+        match.currentTurnUserId === currentUser.id;
+
+    for (let row = 0; row < match.boardSize; row++) {
+        for (
+            let column = 0;
+            column < match.boardSize;
+            column++
+        ) {
+            const button = document.createElement("button");
+
+            button.className = "board-cell";
+            button.type = "button";
+
+            const move =
+                movesByPosition.get(`${row}:${column}`);
+
+            if (move) {
+                button.textContent = move.symbol;
+
+                button.classList.add(
+                    move.symbol === "X"
+                        ? "symbol-x"
+                        : "symbol-o");
+            }
+
+            const canPlay =
+                match.status === "InProgress" &&
+                isMyTurn &&
+                !move;
+
+            button.disabled = !canPlay;
+
+            if (canPlay) {
+                button.addEventListener(
+                    "click",
+                    () => makeMove(row, column));
+            }
+
+            gameBoard.append(button);
+        }
+    }
+}
+
+function updateMatchStatus(match) {
+    gameMessage.className = "message";
+
+    if (match.status === "WaitingForOpponent") {
+        matchStatus.textContent =
+            "Čeka se protivnik...";
+
+        gameMessage.textContent =
+            "Meč će početi kada se drugi igrač pridruži.";
+
+        return;
+    }
+
+    if (match.status === "Finished") {
+        matchStatus.textContent =
+            "Meč je završen.";
+
+        if (match.winnerUserId === null) {
+            gameMessage.textContent =
+                "Partija je završena nerešeno.";
+        } else if (
+            match.winnerUserId === currentUser.id
+        ) {
+            gameMessage.textContent =
+                "Pobedili ste!";
+            gameMessage.classList.add("success");
+        } else {
+            gameMessage.textContent =
+                `${match.winnerUserName} je pobedio.`;
+        }
+
+        return;
+    }
+
+    if (
+        match.currentTurnUserId === currentUser.id
+    ) {
+        matchStatus.textContent =
+            "Tvoj potez.";
+
+        gameMessage.textContent =
+            "Izaberi slobodno polje.";
+    } else {
+        matchStatus.textContent =
+            "Protivnikov potez.";
+
+        gameMessage.textContent =
+            "Sačekajte da protivnik odigra.";
+    }
+}
+
+async function makeMove(row, column) {
+    if (!activeMatchId) {
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            `/api/matches/${activeMatchId}/moves`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    row,
+                    column
+                })
+            });
+
+        if (!response.ok) {
+            const error = await readError(response);
+
+            gameMessage.textContent = error;
+
+            await loadActiveMatch();
+
+            return;
+        }
+
+        await loadActiveMatch();
+    } catch {
+        gameMessage.textContent =
+            "Potez nije moguće odigrati.";
+    }
+}
+
+backToLobbyButton.addEventListener(
+    "click",
+    () => {
+        closeMatch();
+    });
+
+function closeMatch() {
+    stopMatchPolling();
+
+    activeMatchId = null;
+
+    gameBoard.replaceChildren();
+
+    matchView.classList.add("hidden");
+    lobbyView.classList.remove("hidden");
+
+    loadMatches();
 }
