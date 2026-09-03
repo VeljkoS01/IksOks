@@ -83,64 +83,94 @@
                 Odjavi se
             </button>
         </header>
+        <section id="lobby-view">
+            <div class="dashboard-grid">
+                <section class="dashboard-card">
+                    <h2>Napravi meč</h2>
 
-        <div class="dashboard-grid">
-            <section class="dashboard-card">
-                <h2>Napravi meč</h2>
+                    <form id="create-match-form">
+                        <div class="form-field">
+                            <label for="board-size">
+                                Veličina table
+                            </label>
 
-                <form id="create-match-form">
-                    <div class="form-field">
-                        <label for="board-size">
-                            Veličina table
-                        </label>
+                            <input id="board-size"
+                                   type="number"
+                                   min="3"
+                                   max="10"
+                                   value="3"
+                                   required>
+                        </div>
 
-                        <input id="board-size"
-                               type="number"
-                               min="3"
-                               max="10"
-                               value="3"
-                               required>
+                        <div class="form-field">
+                            <label for="win-length">
+                                Polja za pobedu
+                            </label>
+
+                            <input id="win-length"
+                                   type="number"
+                                   min="3"
+                                   max="3"
+                                   value="3"
+                                   required>
+                        </div>
+
+                        <button class="primary-button"
+                                type="submit">
+                            Napravi meč
+                        </button>
+                    </form>
+
+                    <p id="match-message"
+                       class="message"
+                       aria-live="polite">
+                    </p>
+                </section>
+
+                <section class="dashboard-card">
+                    <div class="matches-header">
+                        <h2>Dostupni mečevi</h2>
+
+                        <button id="refresh-matches-button"
+                                class="secondary-button"
+                                type="button">
+                            Osveži
+                        </button>
                     </div>
 
-                    <div class="form-field">
-                        <label for="win-length">
-                            Polja za pobedu
-                        </label>
-
-                        <input id="win-length"
-                               type="number"
-                               min="3"
-                               max="3"
-                               value="3"
-                               required>
-                    </div>
-
-                    <button class="primary-button"
-                            type="submit">
-                        Napravi meč
-                    </button>
-                </form>
-
-                <p id="match-message"
-                   class="message"
-                   aria-live="polite">
-                </p>
-            </section>
-
-            <section class="dashboard-card">
-                <div class="matches-header">
-                    <h2>Dostupni mečevi</h2>
-
-                    <button id="refresh-matches-button"
-                            class="secondary-button"
-                            type="button">
-                        Osveži
-                    </button>
+                    <div id="matches-list" class="matches-list"></div>
+                </section>
+            </div>
+        </section>
+        <section id="match-view" class="match-view hidden">
+            <div class="match-header">
+                <div>
+                    <h2 id="match-title">IksOks meč</h2>
+                    <p id="match-status" class="match-status"></p>
                 </div>
 
-                <div id="matches-list" class="matches-list"></div>
-            </section>
-        </div>
+                <div class="match-symbol">
+                    Tvoj znak:
+                    <strong id="player-symbol">-</strong>
+                </div>
+            </div>
+
+            <div id="game-board"
+                 class="game-board"
+                 aria-label="IksOks tabla">
+            </div>
+
+            <p id="game-message"
+               class="message"
+               aria-live="polite">
+            </p>
+
+            <button id="back-to-lobby-button"
+                    class="secondary-button hidden"
+                    type="button">
+                Nazad na početnu
+            </button>
+        </section>
     </main>
 
     <script src="/js/auth.js"></script>

@@ -230,3 +230,74 @@ input {
         grid-template-columns: 1fr;
     }
 }
+.match-view {
+    max-width: 700px;
+    margin: 0 auto;
+}
+
+.match-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+    .match-header h2 {
+        margin: 0 0 6px;
+    }
+
+.match-status {
+    margin: 0;
+    color: #6b7280;
+}
+
+.match-symbol {
+    padding: 10px 14px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e5e7eb;
+}
+
+.game-board {
+    display: grid;
+    width: min(90vw, 520px);
+    aspect-ratio: 1;
+    margin: 0 auto;
+    gap: 6px;
+}
+
+.board-cell {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 0;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: white;
+    font-size: clamp(24px, 6vw, 56px);
+    font-weight: 700;
+    cursor: pointer;
+}
+
+    .board-cell:hover:not(:disabled) {
+        background: #f3f4f6;
+    }
+
+    .board-cell:disabled {
+        cursor: default;
+    }
+
+    .board-cell.symbol-x {
+        color: #1d4ed8;
+    }
+
+    .board-cell.symbol-o {
+        color: #b91c1c;
+    }
+
+#back-to-lobby-button {
+    display: block;
+    margin: 24px auto 0;
+}
