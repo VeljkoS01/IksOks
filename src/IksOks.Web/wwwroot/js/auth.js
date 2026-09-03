@@ -27,7 +27,8 @@ const backToLobbyButton = document.querySelector("#back-to-lobby-button");
 let mode = "login";
 let currentUser = null;
 let activeMatchId = null;
-let matchPollingId = null;
+let hubConnection = null;
+let hubStartPromise = null;
 
 loginTab.addEventListener("click", () => {
     setMode("login");
@@ -181,12 +182,12 @@ function showAuthenticatedUser(user) {
         `Dobrodošli, ${user.userName}!`;
 
     clearMessage();
-
     loadMatches();
+    void ensureRealtimeConnected();
 }
 
 function showAuthPage() {
-    stopMatchPolling();
+
     activeMatchId = null;
     currentUser = null;
     matchesList.replaceChildren();
@@ -201,19 +202,18 @@ function showAuthPage() {
 }
 
 logoutButton.addEventListener("click", async () => {
-    try {
-        const response = await fetch("/api/auth/logout", {
+    const response = await fetch(
+        "/api/auth/logout",
+        {
             method: "POST"
         });
 
-        if (!response.ok) {
-            return;
-        }
-
-        showAuthPage();
-    } catch {
-        //Ako server nije dostupan, ostavljamo trenutni ekran.
+    if (!response.ok) {
+        return;
     }
+
+    await stopRealtimeConnection();
+    showAuthPage();
 });
 
 boardSizeInput.addEventListener("input", () => {
@@ -258,7 +258,7 @@ createMatchForm.addEventListener(
             "Meč je uspešno napravljen.",
             "success");
 
-        openMatch(match.id);
+        await openMatch(match.id);
     });
 
 refreshMatchesButton.addEventListener(
@@ -329,8 +329,8 @@ function renderMatches(matches) {
         } else {
             button.textContent = "Pridruži se";
 
-            button.addEventListener("click", () => {
-                joinMatch(match.id);
+            button.addEventListener("click", async () => {
+               await joinMatch(match.id);
             });
         }
 
@@ -358,7 +358,7 @@ async function joinMatch(matchId) {
 
         const match = await response.json();
 
-        openMatch(match.id);
+        await openMatch(match.id);
 
     } catch {
         showMatchMessage(
@@ -372,7 +372,7 @@ function showMatchMessage(text, type) {
     matchMessage.className = `message ${type}`;
 }
 
-function openMatch(matchId) {
+async function openMatch(matchId) {
     activeMatchId = matchId;
 
     lobbyView.classList.add("hidden");
@@ -380,26 +380,11 @@ function openMatch(matchId) {
 
     backToLobbyButton.classList.add("hidden");
 
-    loadActiveMatch();
-    startMatchPolling();
+    await joinMatchGroup(matchId);
+
+    await loadActiveMatch();
 }
 
-function startMatchPolling() {
-    stopMatchPolling();
-
-    matchPollingId = window.setInterval(() => {
-        loadActiveMatch();
-    }, 1000);
-}
-
-function stopMatchPolling() {
-    if (matchPollingId === null) {
-        return;
-    }
-
-    window.clearInterval(matchPollingId);
-    matchPollingId = null;
-}
 
 async function loadActiveMatch() {
     if (!activeMatchId) {
@@ -454,7 +439,6 @@ function renderMatch(match) {
     updateMatchStatus(match);
 
     if (match.status === "Finished") {
-        stopMatchPolling();
 
         backToLobbyButton.classList.remove("hidden");
     }
@@ -607,19 +591,201 @@ async function makeMove(row, column) {
 
 backToLobbyButton.addEventListener(
     "click",
-    () => {
-        closeMatch();
+    async () => {
+        await closeMatch();
     });
 
-function closeMatch() {
-    stopMatchPolling();
+async function closeMatch() {
+    const matchId = activeMatchId;
 
     activeMatchId = null;
+
+    if (matchId) {
+        await leaveMatchGroup(matchId);
+    }
 
     gameBoard.replaceChildren();
 
     matchView.classList.add("hidden");
     lobbyView.classList.remove("hidden");
 
-    loadMatches();
+    await loadMatches();
+}
+
+function createHubConnection() {
+    if (hubConnection !== null) {
+        return;
+    }
+
+    hubConnection = new signalR.HubConnectionBuilder()
+        .withUrl("/hubs/match")
+        .withAutomaticReconnect()
+        .build();
+
+    hubConnection.on(
+        "MatchUpdated",
+        async matchId => {
+            if (!activeMatchId) {
+                return;
+            }
+
+            const currentId =
+                activeMatchId.toLowerCase();
+
+            const updatedId =
+                String(matchId).toLowerCase();
+
+            if (currentId !== updatedId) {
+                return;
+            }
+
+            await loadActiveMatch();
+        });
+
+    hubConnection.on(
+        "LobbyUpdated",
+        async () => {
+            if (!currentUser) {
+                return;
+            }
+
+            if (
+                lobbyView.classList.contains("hidden")
+            ) {
+                return;
+            }
+
+            await loadMatches();
+        });
+
+    hubConnection.onreconnected(
+        async () => {
+            if (activeMatchId) {
+                await joinMatchGroup(
+                    activeMatchId);
+            } else if (currentUser) {
+                await loadMatches();
+            }
+        });
+
+    hubConnection.onreconnecting(
+        () => {
+            if (!activeMatchId) {
+                return;
+            }
+
+            gameMessage.textContent =
+                "Live veza se ponovo uspostavlja...";
+        });
+
+    hubConnection.onclose(
+        () => {
+            if (!activeMatchId) {
+                return;
+            }
+
+            gameMessage.textContent =
+                "Live veza trenutno nije dostupna.";
+        });
+}
+
+async function ensureRealtimeConnected() {
+    createHubConnection();
+
+    if (
+        hubConnection.state ===
+        signalR.HubConnectionState.Connected
+    ) {
+        return true;
+    }
+
+    if (
+        hubConnection.state ===
+        signalR.HubConnectionState.Reconnecting
+    ) {
+        return false;
+    }
+
+    if (hubStartPromise !== null) {
+        try {
+            await hubStartPromise;
+
+            return (
+                hubConnection.state ===
+                signalR.HubConnectionState.Connected
+            );
+        } catch {
+            return false;
+        }
+    }
+
+    hubStartPromise = hubConnection.start();
+
+    try {
+        await hubStartPromise;
+
+        return true;
+    } catch (error) {
+        console.error(
+            "SignalR connection failed:",
+            error);
+
+        return false;
+    } finally {
+        hubStartPromise = null;
+    }
+}
+
+async function joinMatchGroup(matchId) {
+    const connected =
+        await ensureRealtimeConnected();
+
+    if (!connected) {
+        return;
+    }
+
+    try {
+        await hubConnection.invoke(
+            "JoinMatch",
+            matchId);
+    } catch (error) {
+        console.error(
+            "Could not join SignalR match group:",
+            error);
+    }
+}
+async function leaveMatchGroup(matchId) {
+    if (
+        !hubConnection ||
+        hubConnection.state !==
+        signalR.HubConnectionState.Connected
+    ) {
+        return;
+    }
+
+    try {
+        await hubConnection.invoke(
+            "LeaveMatch",
+            matchId);
+    } catch (error) {
+        console.error(
+            "Could not leave SignalR match group:",
+            error);
+    }
+}
+async function stopRealtimeConnection() {
+    if (hubConnection === null) {
+        return;
+    }
+
+    try {
+        await hubConnection.stop();
+    } catch (error) {
+        console.error(
+            "Could not stop SignalR connection:",
+            error);
+    }
+
+    hubConnection = null;
+    hubStartPromise = null;
 }
