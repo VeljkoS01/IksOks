@@ -75,5 +75,52 @@ public sealed class IksOksDbContext : DbContext
             .WithMany()
             .HasForeignKey(x => x.WinnerUserId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        var move = modelBuilder.Entity<MatchMove>();
+
+        move.ToTable("MatchMoves");
+
+        move.HasKey(x => x.Id);
+
+        move.Property(x => x.Row)
+            .IsRequired();
+
+        move.Property(x => x.Column)
+            .IsRequired();
+
+        move.Property(x => x.MoveNumber)
+            .IsRequired();
+
+        move.Property(x => x.Symbol)
+            .HasMaxLength(1)
+            .IsRequired();
+
+        move.Property(x => x.CreatedAt)
+            .IsRequired();
+
+        move.HasOne(x => x.Match)
+            .WithMany(x => x.Moves)
+            .HasForeignKey(x => x.MatchId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        move.HasOne(x => x.PlayerUser)
+            .WithMany()
+            .HasForeignKey(x => x.PlayerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        move.HasIndex(x => new
+        {
+            x.MatchId,
+            x.Row,
+            x.Column
+        })
+        .IsUnique();
+
+        move.HasIndex(x => new
+        {
+            x.MatchId,
+            x.MoveNumber
+        })
+        .IsUnique();
     }
 }
