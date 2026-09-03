@@ -4,6 +4,7 @@ using IksOks.Web.Domain.Entities;
 using IksOks.Web.Endpoints;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using IksOks.Web.Realtime;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,6 +41,7 @@ builder.Services
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddSignalR();
 
 var app = builder.Build();
 
@@ -59,5 +61,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapAuthEndpoints();
 app.MapMatchEndpoints();
+app.MapHub<MatchHub>("/hubs/match")
+    .RequireAuthorization();
 
 app.Run();

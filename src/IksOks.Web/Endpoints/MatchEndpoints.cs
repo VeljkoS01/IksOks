@@ -5,6 +5,8 @@ using IksOks.Web.Domain.Enums;
 using IksOks.Web.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using IksOks.Web.Domain.Services;
+using IksOks.Web.Realtime;
+using Microsoft.AspNetCore.SignalR;
 
 namespace IksOks.Web.Endpoints;
 
@@ -30,6 +32,7 @@ public static class MatchEndpoints
         CreateMatchRequest request,
         ClaimsPrincipal principal,
         IksOksDbContext db,
+        IHubContext<MatchHub> hub,
         CancellationToken cancellationToken)
     {
         if (request.BoardSize < 3 || request.BoardSize > 10)
@@ -80,6 +83,8 @@ public static class MatchEndpoints
 
         await db.SaveChangesAsync(cancellationToken);
 
+        await hub.Clients.All.SendAsync("LobbyUpdated");
+
         return Results.Created(
             $"/api/matches/{match.Id}",
             ToResponse(match, owner.UserName));
@@ -129,10 +134,11 @@ public static class MatchEndpoints
     }
 
     private static async Task<IResult> JoinMatchAsync(
-    Guid matchId,
-    ClaimsPrincipal principal,
-    IksOksDbContext db,
-    CancellationToken cancellationToken)
+        Guid matchId,
+        ClaimsPrincipal principal,
+        IksOksDbContext db,
+        IHubContext<MatchHub> hub,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -229,6 +235,15 @@ public static class MatchEndpoints
                 match.CreatedAt))
             .SingleAsync(cancellationToken);
 
+        await hub.Clients
+            .Group(MatchHub.GroupName(matchId))
+            .SendAsync(
+                "MatchUpdated",
+                matchId);
+
+        await hub.Clients.All
+            .SendAsync("LobbyUpdated");
+
         return Results.Ok(response);
     }
 
@@ -259,11 +274,12 @@ public static class MatchEndpoints
     }
 
     private static async Task<IResult> MakeMoveAsync(
-    Guid matchId,
-    MakeMoveRequest request,
-    ClaimsPrincipal principal,
-    IksOksDbContext db,
-    CancellationToken cancellationToken)
+        Guid matchId,
+        MakeMoveRequest request,
+        ClaimsPrincipal principal,
+        IksOksDbContext db,
+        IHubContext<MatchHub> hub,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -389,6 +405,12 @@ public static class MatchEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+
+            await hub.Clients
+                .Group(MatchHub.GroupName(matchId))
+                .SendAsync(
+                    "MatchUpdated",
+                    matchId);
         }
         catch (DbUpdateException)
         {
