@@ -301,3 +301,25 @@ input {
     display: block;
     margin: 24px auto 0;
 }
+
+.personal-matches-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 24px;
+}
+
+.personal-match-result {
+    font-weight: 700;
+}
+
+.personal-match-date {
+    color: #6b7280;
+    font-size: 13px;
+}
+
+@media (max-width: 760px) {
+    .personal-matches-grid {
+        grid-template-columns: 1fr;
+    }
+}
