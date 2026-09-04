@@ -24,6 +24,8 @@ public static class MatchEndpoints
         group.MapPost("/{matchId:guid}/join", JoinMatchAsync);
         group.MapGet("/{matchId:guid}", GetMatchAsync);
         group.MapPost("/{matchId:guid}/moves",MakeMoveAsync);
+        group.MapGet("/mine/active",GetMyActiveMatchesAsync);
+        group.MapGet("/mine/history",GetMyMatchHistoryAsync);
 
         return endpoints;
     }
@@ -411,6 +413,12 @@ public static class MatchEndpoints
                 .SendAsync(
                     "MatchUpdated",
                     matchId);
+
+            if (match.Status == MatchStatus.Finished)
+            {
+                await hub.Clients.All
+                    .SendAsync("LobbyUpdated");
+            }
         }
         catch (DbUpdateException)
         {
@@ -474,5 +482,100 @@ public static class MatchEndpoints
             match.CreatedAt,
             match.FinishedAt,
             moves);
+    }
+
+    private static async Task<IResult> GetMyActiveMatchesAsync(
+    ClaimsPrincipal principal,
+    IksOksDbContext db,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(userIdValue, out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var matches = await db.Matches
+            .AsNoTracking()
+            .Where(match =>
+                (
+                    match.OwnerUserId == userId ||
+                    match.OpponentUserId == userId
+                ) &&
+                (
+                    match.Status ==
+                        MatchStatus.WaitingForOpponent ||
+                    match.Status ==
+                        MatchStatus.InProgress
+                ))
+            .OrderByDescending(match => match.CreatedAt)
+            .Select(match => new UserMatchResponse(
+                match.Id,
+                match.OwnerUserId,
+                match.OwnerUser.UserName,
+                match.OpponentUserId,
+                match.OpponentUser == null
+                    ? null
+                    : match.OpponentUser.UserName,
+                match.BoardSize,
+                match.WinLength,
+                match.Status.ToString(),
+                match.WinnerUserId,
+                match.WinnerUser == null
+                    ? null
+                    : match.WinnerUser.UserName,
+                match.CreatedAt,
+                match.FinishedAt))
+            .ToListAsync(cancellationToken);
+
+        return Results.Ok(matches);
+    }
+    private static async Task<IResult> GetMyMatchHistoryAsync(
+    ClaimsPrincipal principal,
+    IksOksDbContext db,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(userIdValue, out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var matches = await db.Matches
+            .AsNoTracking()
+            .Where(match =>
+                (
+                    match.OwnerUserId == userId ||
+                    match.OpponentUserId == userId
+                ) &&
+                match.Status == MatchStatus.Finished)
+            .OrderByDescending(match => match.FinishedAt)
+            .Take(50)
+            .Select(match => new UserMatchResponse(
+                match.Id,
+                match.OwnerUserId,
+                match.OwnerUser.UserName,
+                match.OpponentUserId,
+                match.OpponentUser == null
+                    ? null
+                    : match.OpponentUser.UserName,
+                match.BoardSize,
+                match.WinLength,
+                match.Status.ToString(),
+                match.WinnerUserId,
+                match.WinnerUser == null
+                    ? null
+                    : match.WinnerUser.UserName,
+                match.CreatedAt,
+                match.FinishedAt))
+            .ToListAsync(cancellationToken);
+
+        return Results.Ok(matches);
     }
 }
