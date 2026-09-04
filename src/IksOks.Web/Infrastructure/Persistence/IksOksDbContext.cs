@@ -1,5 +1,6 @@
 ﻿using IksOks.Web.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using IksOks.Web.Infrastructure.Persistence.Entities;
 
 namespace IksOks.Web.Infrastructure.Persistence;
 
@@ -13,6 +14,7 @@ public sealed class IksOksDbContext : DbContext
     public DbSet<AppUser> Users => Set<AppUser>();
     public DbSet<GameMatch> Matches => Set<GameMatch>();
     public DbSet<MatchMove> MatchMoves => Set<MatchMove>();
+    public DbSet<MatchFinishedEventRecord> MatchFinishedEvents => Set<MatchFinishedEventRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -122,5 +124,33 @@ public sealed class IksOksDbContext : DbContext
             x.MoveNumber
         })
         .IsUnique();
+
+        var matchFinishedEvent = modelBuilder.Entity<MatchFinishedEventRecord>();
+
+        matchFinishedEvent.ToTable("MatchFinishedEvents");
+
+        matchFinishedEvent.HasKey(x => x.Id);
+
+        matchFinishedEvent.Property(x => x.EventId)
+            .IsRequired();
+
+        matchFinishedEvent.Property(x => x.MatchId)
+            .IsRequired();
+
+        matchFinishedEvent.Property(x => x.IsDraw)
+            .IsRequired();
+
+        matchFinishedEvent.Property(x => x.FinishedAt)
+            .IsRequired();
+
+        matchFinishedEvent.Property(x => x.ProcessedAt)
+            .IsRequired();
+
+        matchFinishedEvent
+            .HasIndex(x => x.EventId)
+            .IsUnique();
+
+        matchFinishedEvent
+            .HasIndex(x => x.MatchId);
     }
 }

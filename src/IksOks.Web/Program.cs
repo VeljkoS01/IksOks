@@ -52,6 +52,9 @@ builder.Services.AddSingleton<
     IEventPublisher,
     RabbitMqEventPublisher>();
 
+builder.Services.AddHostedService<
+    MatchFinishedConsumer>();
+
 var app = builder.Build();
 
 app.UseDefaultFiles();

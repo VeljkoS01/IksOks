@@ -807,35 +807,57 @@ async function loadMyMatches() {
             fetch("/api/matches/mine/history")
         ]);
 
-        if (
-            !activeResponse.ok ||
-            !historyResponse.ok
-        ) {
-            return;
+        if (activeResponse.ok) {
+            const activeMatches =
+                await activeResponse.json();
+
+            renderActiveMatches(activeMatches);
+        } else {
+            activeMatchesList.replaceChildren();
+
+            const error =
+                document.createElement("p");
+
+            error.className = "empty-state";
+            error.textContent =
+                "Nije moguće učitati aktivne mečeve.";
+
+            activeMatchesList.append(error);
         }
 
-        const [
-            activeMatches,
-            historyMatches
-        ] = await Promise.all([
-            activeResponse.json(),
-            historyResponse.json()
-        ]);
+        if (historyResponse.ok) {
+            const historyMatches =
+                await historyResponse.json();
 
-        renderActiveMatches(activeMatches);
-        renderMatchHistory(historyMatches);
-    } catch {
+            renderMatchHistory(historyMatches);
+        } else {
+            matchHistoryList.replaceChildren();
+
+            const error =
+                document.createElement("p");
+
+            error.className = "empty-state";
+            error.textContent =
+                "Nije moguće učitati istoriju mečeva.";
+
+            matchHistoryList.append(error);
+        }
+    } catch (error) {
+        console.error(
+            "Could not load user matches:",
+            error);
+
         activeMatchesList.replaceChildren();
         matchHistoryList.replaceChildren();
 
-        const error =
+        const message =
             document.createElement("p");
 
-        error.className = "empty-state";
-        error.textContent =
+        message.className = "empty-state";
+        message.textContent =
             "Nije moguće učitati vaše mečeve.";
 
-        activeMatchesList.append(error);
+        activeMatchesList.append(message);
     }
 }
 

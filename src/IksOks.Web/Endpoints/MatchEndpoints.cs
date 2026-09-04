@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore;
 using IksOks.Web.Domain.Services;
 using IksOks.Web.Realtime;
 using Microsoft.AspNetCore.SignalR;
+using IksOks.Web.Messaging;
+using IksOks.Web.Messaging.Contracts;
 
 namespace IksOks.Web.Endpoints;
 
@@ -281,6 +283,7 @@ public static class MatchEndpoints
         ClaimsPrincipal principal,
         IksOksDbContext db,
         IHubContext<MatchHub> hub,
+        IEventPublisher eventPublisher,
         CancellationToken cancellationToken)
     {
         var userIdValue = principal
@@ -407,6 +410,25 @@ public static class MatchEndpoints
         {
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
+
+            if (match.Status == MatchStatus.Finished)
+            {
+                var matchFinishedEvent =
+                    new MatchFinishedEvent(
+                        Guid.NewGuid(),
+                        match.Id,
+                        match.OwnerUserId,
+                        match.OpponentUserId!.Value,
+                        match.WinnerUserId,
+                        match.WinnerUserId is null,
+                        match.BoardSize,
+                        match.WinLength,
+                        match.FinishedAt!.Value);
+
+                await eventPublisher.PublishMatchFinishedAsync(
+                    matchFinishedEvent,
+                    cancellationToken);
+            }
 
             await hub.Clients
                 .Group(MatchHub.GroupName(matchId))
