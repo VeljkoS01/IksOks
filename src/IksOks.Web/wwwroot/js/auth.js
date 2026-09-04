@@ -23,6 +23,9 @@ const playerSymbol = document.querySelector("#player-symbol");
 const gameBoard = document.querySelector("#game-board");
 const gameMessage = document.querySelector("#game-message");
 const backToLobbyButton = document.querySelector("#back-to-lobby-button");
+const activeMatchesList = document.querySelector("#active-matches-list");
+const matchHistoryList = document.querySelector("#match-history-list");
+const refreshMyMatchesButton = document.querySelector("#refresh-my-matches-button");
 
 let mode = "login";
 let currentUser = null;
@@ -182,15 +185,19 @@ function showAuthenticatedUser(user) {
         `Dobrodošli, ${user.userName}!`;
 
     clearMessage();
-    loadMatches();
+
+    void loadMatches();
+    void loadMyMatches();
     void ensureRealtimeConnected();
 }
 
 function showAuthPage() {
-
     activeMatchId = null;
     currentUser = null;
+
     matchesList.replaceChildren();
+    activeMatchesList.replaceChildren();
+    matchHistoryList.replaceChildren();
 
     appPage.classList.add("hidden");
     authPage.classList.remove("hidden");
@@ -378,10 +385,9 @@ async function openMatch(matchId) {
     lobbyView.classList.add("hidden");
     matchView.classList.remove("hidden");
 
-    backToLobbyButton.classList.add("hidden");
+    backToLobbyButton.classList.remove("hidden");
 
     await joinMatchGroup(matchId);
-
     await loadActiveMatch();
 }
 
@@ -437,11 +443,6 @@ function renderMatch(match) {
     renderBoard(match);
 
     updateMatchStatus(match);
-
-    if (match.status === "Finished") {
-
-        backToLobbyButton.classList.remove("hidden");
-    }
 }
 
 function renderBoard(match) {
@@ -609,7 +610,10 @@ async function closeMatch() {
     matchView.classList.add("hidden");
     lobbyView.classList.remove("hidden");
 
-    await loadMatches();
+    await Promise.all([
+        loadMatches(),
+        loadMyMatches()
+    ]);
 }
 
 function createHubConnection() {
@@ -655,7 +659,10 @@ function createHubConnection() {
                 return;
             }
 
-            await loadMatches();
+            await Promise.all([
+                loadMatches(),
+                loadMyMatches()
+            ]);
         });
 
     hubConnection.onreconnected(
@@ -789,3 +796,234 @@ async function stopRealtimeConnection() {
     hubConnection = null;
     hubStartPromise = null;
 }
+
+async function loadMyMatches() {
+    try {
+        const [
+            activeResponse,
+            historyResponse
+        ] = await Promise.all([
+            fetch("/api/matches/mine/active"),
+            fetch("/api/matches/mine/history")
+        ]);
+
+        if (
+            !activeResponse.ok ||
+            !historyResponse.ok
+        ) {
+            return;
+        }
+
+        const [
+            activeMatches,
+            historyMatches
+        ] = await Promise.all([
+            activeResponse.json(),
+            historyResponse.json()
+        ]);
+
+        renderActiveMatches(activeMatches);
+        renderMatchHistory(historyMatches);
+    } catch {
+        activeMatchesList.replaceChildren();
+        matchHistoryList.replaceChildren();
+
+        const error =
+            document.createElement("p");
+
+        error.className = "empty-state";
+        error.textContent =
+            "Nije moguće učitati vaše mečeve.";
+
+        activeMatchesList.append(error);
+    }
+}
+
+function renderActiveMatches(matches) {
+    activeMatchesList.replaceChildren();
+
+    if (matches.length === 0) {
+        const empty =
+            document.createElement("p");
+
+        empty.className = "empty-state";
+        empty.textContent =
+            "Nemate aktivne mečeve.";
+
+        activeMatchesList.append(empty);
+        return;
+    }
+
+    for (const match of matches) {
+        const card =
+            document.createElement("article");
+
+        card.className = "match-card";
+
+        const info =
+            document.createElement("div");
+
+        info.className = "match-info";
+
+        const isOwner =
+            match.ownerUserId === currentUser.id;
+
+        const opponentName = isOwner
+            ? match.opponentUserName
+            : match.ownerUserName;
+
+        const title =
+            document.createElement("span");
+
+        title.className = "match-owner";
+
+        title.textContent = opponentName
+            ? `Protiv ${opponentName}`
+            : "Čeka se protivnik";
+
+        const details =
+            document.createElement("span");
+
+        details.className = "match-details";
+
+        const statusText =
+            match.status === "InProgress"
+                ? "U toku"
+                : "Čeka protivnika";
+
+        details.textContent =
+            `${match.boardSize}×${match.boardSize}` +
+            ` · ${match.winLength} za pobedu` +
+            ` · ${statusText}`;
+
+        info.append(title, details);
+
+        const button =
+            document.createElement("button");
+
+        button.className = "secondary-button";
+        button.type = "button";
+
+        button.textContent =
+            match.status === "InProgress"
+                ? "Nastavi"
+                : "Otvori";
+
+        button.addEventListener(
+            "click",
+            async () => {
+                await openMatch(match.id);
+            });
+
+        card.append(info, button);
+
+        activeMatchesList.append(card);
+    }
+}
+
+function renderMatchHistory(matches) {
+    matchHistoryList.replaceChildren();
+
+    if (matches.length === 0) {
+        const empty =
+            document.createElement("p");
+
+        empty.className = "empty-state";
+        empty.textContent =
+            "Još nemate završenih mečeva.";
+
+        matchHistoryList.append(empty);
+        return;
+    }
+
+    for (const match of matches) {
+        const card =
+            document.createElement("article");
+
+        card.className = "match-card";
+
+        const info =
+            document.createElement("div");
+
+        info.className = "match-info";
+
+        const isOwner =
+            match.ownerUserId === currentUser.id;
+
+        const opponentName = isOwner
+            ? match.opponentUserName
+            : match.ownerUserName;
+
+        const title =
+            document.createElement("span");
+
+        title.className = "match-owner";
+
+        title.textContent =
+            `Protiv ${opponentName ?? "nepoznatog igrača"}`;
+
+        const result =
+            document.createElement("span");
+
+        result.className =
+            "personal-match-result";
+
+        if (match.winnerUserId === null) {
+            result.textContent = "Nerešeno";
+        } else if (
+            match.winnerUserId === currentUser.id
+        ) {
+            result.textContent = "Pobeda";
+        } else {
+            result.textContent = "Poraz";
+        }
+
+        const details =
+            document.createElement("span");
+
+        details.className = "match-details";
+
+        details.textContent =
+            `${match.boardSize}×${match.boardSize}` +
+            ` · ${match.winLength} za pobedu`;
+
+        const date =
+            document.createElement("span");
+
+        date.className = "personal-match-date";
+
+        const finishedAt =
+            match.finishedAt ?? match.createdAt;
+
+        date.textContent =
+            new Date(finishedAt)
+                .toLocaleString("sr-RS");
+
+        info.append(
+            title,
+            result,
+            details,
+            date);
+
+        const button =
+            document.createElement("button");
+
+        button.className = "secondary-button";
+        button.type = "button";
+        button.textContent = "Pogledaj";
+
+        button.addEventListener(
+            "click",
+            async () => {
+                await openMatch(match.id);
+            });
+
+        card.append(info, button);
+
+        matchHistoryList.append(card);
+    }
+}
+
+refreshMyMatchesButton.addEventListener(
+    "click",
+    loadMyMatches);
