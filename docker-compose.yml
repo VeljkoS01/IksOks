@@ -12,9 +12,17 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__Default: Host=postgres;Port=5432;Database=iksoks;Username=iksoks;Password=iksoks_dev
+      RabbitMq__HostName: rabbitmq
+      RabbitMq__Port: 5672
+      RabbitMq__UserName: iksoks
+      RabbitMq__Password: iksoks_dev
+      RabbitMq__ExchangeName: iksoks.events
+      RabbitMq__MatchFinishedQueue: iksoks.match-finished
 
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
 
   postgres:
@@ -39,5 +47,28 @@ services:
       timeout: 5s
       retries: 10
 
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+
+    container_name: iksoks-rabbitmq
+
+    environment:
+      RABBITMQ_DEFAULT_USER: iksoks
+      RABBITMQ_DEFAULT_PASS: iksoks_dev
+
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   postgres_data:
+  rabbitmq_data:

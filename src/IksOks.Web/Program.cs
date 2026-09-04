@@ -5,6 +5,7 @@ using IksOks.Web.Endpoints;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using IksOks.Web.Realtime;
+using IksOks.Web.Messaging;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -42,6 +43,14 @@ builder.Services
 
 builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
+
+builder.Services.Configure<RabbitMqOptions>(
+    builder.Configuration.GetSection(
+        RabbitMqOptions.SectionName));
+
+builder.Services.AddSingleton<
+    IEventPublisher,
+    RabbitMqEventPublisher>();
 
 var app = builder.Build();
 
