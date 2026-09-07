@@ -12,28 +12,33 @@ namespace IksOks.Web.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "OutboxMessage",
+                name: "OutboxMessages",
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
-                    RoutingKey = table.Column<string>(type: "text", nullable: false),
+                    RoutingKey = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
                     Payload = table.Column<string>(type: "text", nullable: false),
                     OccurredAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false),
                     ProcessedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: true),
                     AttemptCount = table.Column<int>(type: "integer", nullable: false),
-                    LastError = table.Column<string>(type: "text", nullable: true)
+                    LastError = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_OutboxMessage", x => x.Id);
+                    table.PrimaryKey("PK_OutboxMessages", x => x.Id);
                 });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_OutboxMessages_ProcessedAt_OccurredAt",
+                table: "OutboxMessages",
+                columns: new[] { "ProcessedAt", "OccurredAt" });
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "OutboxMessage");
+                name: "OutboxMessages");
         }
     }
 }

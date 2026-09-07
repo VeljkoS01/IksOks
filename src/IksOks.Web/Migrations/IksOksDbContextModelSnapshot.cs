@@ -183,7 +183,8 @@ namespace IksOks.Web.Migrations
                         .HasColumnType("integer");
 
                     b.Property<string>("LastError")
-                        .HasColumnType("text");
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<DateTimeOffset>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
@@ -197,11 +198,14 @@ namespace IksOks.Web.Migrations
 
                     b.Property<string>("RoutingKey")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
 
                     b.HasKey("Id");
 
-                    b.ToTable("OutboxMessage");
+                    b.HasIndex("ProcessedAt", "OccurredAt");
+
+                    b.ToTable("OutboxMessages", (string)null);
                 });
 
             modelBuilder.Entity("IksOks.Web.Domain.Entities.GameMatch", b =>

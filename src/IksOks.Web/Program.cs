@@ -55,6 +55,9 @@ builder.Services.AddSingleton<
 builder.Services.AddHostedService<
     MatchFinishedConsumer>();
 
+builder.Services.AddHostedService<
+    OutboxPublisher>();
+
 var app = builder.Build();
 
 app.UseDefaultFiles();

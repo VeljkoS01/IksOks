@@ -9,6 +9,8 @@ using IksOks.Web.Realtime;
 using Microsoft.AspNetCore.SignalR;
 using IksOks.Web.Messaging;
 using IksOks.Web.Messaging.Contracts;
+using System.Text.Json;
+using IksOks.Web.Infrastructure.Persistence.Entities;
 
 namespace IksOks.Web.Endpoints;
 
@@ -283,7 +285,6 @@ public static class MatchEndpoints
         ClaimsPrincipal principal,
         IksOksDbContext db,
         IHubContext<MatchHub> hub,
-        IEventPublisher eventPublisher,
         CancellationToken cancellationToken)
     {
         var userIdValue = principal
@@ -406,29 +407,39 @@ public static class MatchEndpoints
             match.FinishedAt = DateTimeOffset.UtcNow;
         }
 
+        if (match.Status == MatchStatus.Finished)
+        {
+            var eventId = Guid.NewGuid();
+
+            var matchFinishedEvent =
+                new MatchFinishedEvent(
+                    eventId,
+                    match.Id,
+                    match.OwnerUserId,
+                    match.OpponentUserId!.Value,
+                    match.WinnerUserId,
+                    match.WinnerUserId is null,
+                    match.BoardSize,
+                    match.WinLength,
+                    match.FinishedAt!.Value);
+
+            var outboxMessage =
+                new OutboxMessage
+                {
+                    Id = eventId,
+                    RoutingKey = "match.finished",
+                    Payload = JsonSerializer.Serialize(
+                        matchFinishedEvent),
+                    OccurredAt = match.FinishedAt.Value
+                };
+
+            db.OutboxMessages.Add(outboxMessage);
+        }
+
         try
         {
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
-
-            if (match.Status == MatchStatus.Finished)
-            {
-                var matchFinishedEvent =
-                    new MatchFinishedEvent(
-                        Guid.NewGuid(),
-                        match.Id,
-                        match.OwnerUserId,
-                        match.OpponentUserId!.Value,
-                        match.WinnerUserId,
-                        match.WinnerUserId is null,
-                        match.BoardSize,
-                        match.WinLength,
-                        match.FinishedAt!.Value);
-
-                await eventPublisher.PublishMatchFinishedAsync(
-                    matchFinishedEvent,
-                    cancellationToken);
-            }
 
             await hub.Clients
                 .Group(MatchHub.GroupName(matchId))
