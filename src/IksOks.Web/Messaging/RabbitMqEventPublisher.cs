@@ -32,6 +32,8 @@ public sealed class RabbitMqEventPublisher
 
         using var channel = connection.CreateModel();
 
+        channel.ConfirmSelect();
+
         channel.ExchangeDeclare(
             exchange: _options.ExchangeName,
             type: ExchangeType.Topic,
@@ -55,6 +57,8 @@ public sealed class RabbitMqEventPublisher
             routingKey: MatchFinishedRoutingKey,
             basicProperties: properties,
             body: body);
+
+        channel.WaitForConfirmsOrDie(TimeSpan.FromSeconds(5));
 
         return Task.CompletedTask;
     }

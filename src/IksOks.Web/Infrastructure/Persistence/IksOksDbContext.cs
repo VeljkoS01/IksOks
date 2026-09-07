@@ -15,7 +15,7 @@ public sealed class IksOksDbContext : DbContext
     public DbSet<GameMatch> Matches => Set<GameMatch>();
     public DbSet<MatchMove> MatchMoves => Set<MatchMove>();
     public DbSet<MatchFinishedEventRecord> MatchFinishedEvents => Set<MatchFinishedEventRecord>();
-    public DbSet<OutboxMessage> OutboxMessage => Set<OutboxMessage>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -153,5 +153,34 @@ public sealed class IksOksDbContext : DbContext
 
         matchFinishedEvent
             .HasIndex(x => x.MatchId);
+
+        var outbox = modelBuilder.Entity<OutboxMessage>();
+
+        outbox.ToTable("OutboxMessages");
+
+        outbox.HasKey(x => x.Id);
+
+        outbox.Property(x => x.RoutingKey)
+            .HasMaxLength(128)
+            .IsRequired();
+
+        outbox.Property(x => x.Payload)
+            .HasColumnType("text")
+            .IsRequired();
+
+        outbox.Property(x => x.OccurredAt)
+            .IsRequired();
+
+        outbox.Property(x => x.AttemptCount)
+            .IsRequired();
+
+        outbox.Property(x => x.LastError)
+            .HasMaxLength(2000);
+
+        outbox.HasIndex(x => new
+        {
+            x.ProcessedAt,
+            x.OccurredAt
+        });
     }
 }
