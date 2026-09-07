@@ -15,6 +15,7 @@ public sealed class IksOksDbContext : DbContext
     public DbSet<GameMatch> Matches => Set<GameMatch>();
     public DbSet<MatchMove> MatchMoves => Set<MatchMove>();
     public DbSet<MatchFinishedEventRecord> MatchFinishedEvents => Set<MatchFinishedEventRecord>();
+    public DbSet<OutboxMessage> OutboxMessage => Set<OutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
