@@ -26,6 +26,7 @@ const backToLobbyButton = document.querySelector("#back-to-lobby-button");
 const activeMatchesList = document.querySelector("#active-matches-list");
 const matchHistoryList = document.querySelector("#match-history-list");
 const refreshMyMatchesButton = document.querySelector("#refresh-my-matches-button");
+const matchModeInput = document.querySelector("#match-mode");
 
 let mode = "login";
 let currentUser = null;
@@ -238,6 +239,7 @@ createMatchForm.addEventListener(
     async (event) => {
         event.preventDefault();
 
+        const mode = matchModeInput.value;
         const boardSize = Number(boardSizeInput.value);
         const winLength = Number(winLengthInput.value);
 
@@ -247,6 +249,7 @@ createMatchForm.addEventListener(
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
+                mode,
                 boardSize,
                 winLength
             })
@@ -316,7 +319,14 @@ function renderMatches(matches) {
 
         const details = document.createElement("span");
         details.className = "match-details";
+
+        const modeText =
+            match.mode === "Classic"
+                ? "Classic"
+                : "Connect-K";
+
         details.textContent =
+            `${modeText} · ` +
             `${match.boardSize}×${match.boardSize} · ` +
             `${match.winLength} za pobedu`;
 
@@ -436,9 +446,14 @@ function renderMatch(match) {
         ? match.opponentUserName
         : match.ownerUserName;
 
+    const modeText =
+        match.mode === "Classic"
+            ? "Classic"
+            : "Connect-K";
+
     matchTitle.textContent = opponentName
-        ? `Meč protiv ${opponentName}`
-        : "Čekanje protivnika";
+        ? `${modeText} protiv ${opponentName}`
+        : `${modeText} · čekanje protivnika`;
 
     renderBoard(match);
 
@@ -913,7 +928,13 @@ function renderActiveMatches(matches) {
                 ? "U toku"
                 : "Čeka protivnika";
 
+        const modeText =
+            match.mode === "Classic"
+                ? "Classic"
+                : "Connect-K";
+
         details.textContent =
+            `${modeText} · ` +
             `${match.boardSize}×${match.boardSize}` +
             ` · ${match.winLength} za pobedu` +
             ` · ${statusText}`;
@@ -1005,7 +1026,13 @@ function renderMatchHistory(matches) {
 
         details.className = "match-details";
 
+        const modeText =
+            match.mode === "Classic"
+                ? "Classic"
+                : "Connect-K";
+
         details.textContent =
+            `${modeText} · ` +
             `${match.boardSize}×${match.boardSize}` +
             ` · ${match.winLength} za pobedu`;
 
@@ -1049,3 +1076,49 @@ function renderMatchHistory(matches) {
 refreshMyMatchesButton.addEventListener(
     "click",
     loadMyMatches);
+
+function updateMatchModeFields() {
+    const mode = matchModeInput.value;
+
+    if (mode === "Classic") {
+        boardSizeInput.value = "3";
+        boardSizeInput.min = "3";
+        boardSizeInput.max = "3";
+        boardSizeInput.disabled = true;
+
+        winLengthInput.value = "3";
+        winLengthInput.min = "3";
+        winLengthInput.max = "3";
+        winLengthInput.disabled = true;
+
+        return;
+    }
+
+    boardSizeInput.disabled = false;
+    winLengthInput.disabled = false;
+
+    boardSizeInput.min = "3";
+    boardSizeInput.max = "10";
+
+    if (Number(boardSizeInput.value) < 3) {
+        boardSizeInput.value = "3";
+    }
+
+    winLengthInput.min = "3";
+    winLengthInput.max =
+        boardSizeInput.value;
+
+    if (
+        Number(winLengthInput.value) >
+        Number(boardSizeInput.value)
+    ) {
+        winLengthInput.value =
+            boardSizeInput.value;
+    }
+}
+
+matchModeInput.addEventListener(
+    "change",
+    updateMatchModeFields);
+
+updateMatchModeFields();
