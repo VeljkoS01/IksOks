@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using IksOks.Web.Realtime;
 using IksOks.Web.Messaging;
+using IksOks.Web.Domain.Strategies;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,6 +58,15 @@ builder.Services.AddHostedService<
 
 builder.Services.AddHostedService<
     OutboxPublisher>();
+
+builder.Services.AddSingleton<
+    ClassicGameRulesStrategy>();
+
+builder.Services.AddSingleton<
+    ConnectKGameRulesStrategy>();
+
+builder.Services.AddSingleton<
+    GameRulesStrategyFactory>();
 
 var app = builder.Build();
 

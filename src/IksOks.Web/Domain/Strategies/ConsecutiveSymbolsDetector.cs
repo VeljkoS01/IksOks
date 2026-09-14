@@ -1,17 +1,19 @@
 ﻿using IksOks.Web.Domain.Entities;
 
-namespace IksOks.Web.Domain.Services;
+namespace IksOks.Web.Domain.Strategies;
 
-public static class GameRules
+internal static class ConsecutiveSymbolsDetector
 {
-    public static bool IsWinningMove(
+    public static bool HasWinningSequence(
         IEnumerable<MatchMove> moves,
         MatchMove lastMove,
-        int winLength)
+        int requiredLength)
     {
         var positions = moves
-            .Where(move => move.Symbol == lastMove.Symbol)
-            .Select(move => (move.Row, move.Column))
+            .Where(move =>
+                move.Symbol == lastMove.Symbol)
+            .Select(move =>
+                (move.Row, move.Column))
             .ToHashSet();
 
         var directions = new[]
@@ -40,7 +42,7 @@ public static class GameRules
                 -direction.Row,
                 -direction.Column);
 
-            if (count >= winLength)
+            if (count >= requiredLength)
             {
                 return true;
             }

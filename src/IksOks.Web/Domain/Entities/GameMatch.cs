@@ -32,4 +32,6 @@ public sealed class GameMatch
 
     public ICollection<MatchMove> Moves { get; set; }
         = new List<MatchMove>();
+    public MatchMode Mode { get; set; }
+    = MatchMode.Classic;
 }

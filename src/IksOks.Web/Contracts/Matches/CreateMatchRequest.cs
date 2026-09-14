@@ -1,3 +1,6 @@
 ﻿namespace IksOks.Web.Contracts.Matches;
 
-public sealed record CreateMatchRequest(int BoardSize,int WinLength);
+public sealed record CreateMatchRequest(
+    string Mode,
+    int BoardSize,
+    int WinLength);

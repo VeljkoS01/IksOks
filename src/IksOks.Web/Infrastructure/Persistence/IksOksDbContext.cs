@@ -79,6 +79,11 @@ public sealed class IksOksDbContext : DbContext
             .HasForeignKey(x => x.WinnerUserId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        match.Property(x => x.Mode)
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired();
+
         var move = modelBuilder.Entity<MatchMove>();
 
         move.ToTable("MatchMoves");

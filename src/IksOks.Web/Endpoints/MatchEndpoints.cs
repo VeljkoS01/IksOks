@@ -4,13 +4,13 @@ using IksOks.Web.Domain.Entities;
 using IksOks.Web.Domain.Enums;
 using IksOks.Web.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
-using IksOks.Web.Domain.Services;
 using IksOks.Web.Realtime;
 using Microsoft.AspNetCore.SignalR;
 using IksOks.Web.Messaging;
 using IksOks.Web.Messaging.Contracts;
 using System.Text.Json;
 using IksOks.Web.Infrastructure.Persistence.Entities;
+using IksOks.Web.Domain.Strategies;
 
 namespace IksOks.Web.Endpoints;
 
@@ -38,23 +38,32 @@ public static class MatchEndpoints
         CreateMatchRequest request,
         ClaimsPrincipal principal,
         IksOksDbContext db,
+        GameRulesStrategyFactory strategyFactory,
         IHubContext<MatchHub> hub,
         CancellationToken cancellationToken)
     {
-        if (request.BoardSize < 3 || request.BoardSize > 10)
+
+        if (!Enum.TryParse<MatchMode>(
+            request.Mode,
+            ignoreCase: true,
+            out var mode))
         {
             return Results.BadRequest(new
             {
-                error = "Board size must be between 3 and 10."
+                error = "Unknown match mode."
             });
         }
 
-        if (request.WinLength < 3 ||
-            request.WinLength > request.BoardSize)
+        var strategy = strategyFactory.GetStrategy(mode);
+
+        if (!strategy.IsValidConfiguration(
+            request.BoardSize,
+            request.WinLength))
         {
             return Results.BadRequest(new
             {
-                error = "Win length must be between 3 and board size."
+                error =
+                    "Configuration is not valid for the selected match mode."
             });
         }
 
@@ -80,6 +89,7 @@ public static class MatchEndpoints
         var match = new GameMatch
         {
             OwnerUserId = owner.Id,
+            Mode = mode,
             BoardSize = request.BoardSize,
             WinLength = request.WinLength,
             Status = MatchStatus.WaitingForOpponent
@@ -113,6 +123,7 @@ public static class MatchEndpoints
                 match.OpponentUser == null
                     ? null
                     : match.OpponentUser.UserName,
+                match.Mode.ToString(),
                 match.BoardSize,
                 match.WinLength,
                 match.Status.ToString(),
@@ -133,6 +144,7 @@ public static class MatchEndpoints
             ownerUserName,
             match.OpponentUserId,
             null,
+            match.Mode.ToString(),
             match.BoardSize,
             match.WinLength,
             match.Status.ToString(),
@@ -235,6 +247,7 @@ public static class MatchEndpoints
                 match.OpponentUser == null
                     ? null
                     : match.OpponentUser.UserName,
+                match.Mode.ToString(),
                 match.BoardSize,
                 match.WinLength,
                 match.Status.ToString(),
@@ -284,6 +297,7 @@ public static class MatchEndpoints
         MakeMoveRequest request,
         ClaimsPrincipal principal,
         IksOksDbContext db,
+        GameRulesStrategyFactory strategyFactory,
         IHubContext<MatchHub> hub,
         CancellationToken cancellationToken)
     {
@@ -390,21 +404,26 @@ public static class MatchEndpoints
             .Append(move)
             .ToList();
 
-        if (GameRules.IsWinningMove(
+        var strategy = strategyFactory.GetStrategy(match.Mode);
+
+        if (strategy.IsWinningMove(
             allMoves,
             move,
             match.WinLength))
         {
             match.Status = MatchStatus.Finished;
             match.WinnerUserId = userId;
-            match.FinishedAt = DateTimeOffset.UtcNow;
+            match.FinishedAt =
+                DateTimeOffset.UtcNow;
         }
-        else if (allMoves.Count ==
-                 match.BoardSize * match.BoardSize)
+        else if (
+            allMoves.Count ==
+            match.BoardSize * match.BoardSize)
         {
             match.Status = MatchStatus.Finished;
             match.WinnerUserId = null;
-            match.FinishedAt = DateTimeOffset.UtcNow;
+            match.FinishedAt =
+                DateTimeOffset.UtcNow;
         }
 
         if (match.Status == MatchStatus.Finished)
@@ -506,6 +525,7 @@ public static class MatchEndpoints
             match.OwnerUser.UserName,
             match.OpponentUserId,
             match.OpponentUser?.UserName,
+            match.Mode.ToString(),
             match.BoardSize,
             match.WinLength,
             match.Status.ToString(),
@@ -553,6 +573,7 @@ public static class MatchEndpoints
                 match.OpponentUser == null
                     ? null
                     : match.OpponentUser.UserName,
+                match.Mode.ToString(),
                 match.BoardSize,
                 match.WinLength,
                 match.Status.ToString(),
@@ -598,6 +619,7 @@ public static class MatchEndpoints
                 match.OpponentUser == null
                     ? null
                     : match.OpponentUser.UserName,
+                match.Mode.ToString(),
                 match.BoardSize,
                 match.WinLength,
                 match.Status.ToString(),

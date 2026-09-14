@@ -6,6 +6,7 @@ public sealed record MatchDetailsResponse(
     string OwnerUserName,
     Guid? OpponentUserId,
     string? OpponentUserName,
+    string Mode,
     int BoardSize,
     int WinLength,
     string Status,
