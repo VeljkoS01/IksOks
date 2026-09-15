@@ -1,12 +1,13 @@
-using IksOks.Web.Infrastructure.Persistence;
-using Microsoft.EntityFrameworkCore;
 using IksOks.Web.Domain.Entities;
-using IksOks.Web.Endpoints;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using IksOks.Web.Realtime;
-using IksOks.Web.Messaging;
+using IksOks.Web.Domain.States;
 using IksOks.Web.Domain.Strategies;
+using IksOks.Web.Endpoints;
+using IksOks.Web.Infrastructure.Persistence;
+using IksOks.Web.Messaging;
+using IksOks.Web.Realtime;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -67,6 +68,21 @@ builder.Services.AddSingleton<
 
 builder.Services.AddSingleton<
     GameRulesStrategyFactory>();
+
+builder.Services.AddSingleton<
+    IMatchState,
+    WaitingForOpponentMatchState>();
+
+builder.Services.AddSingleton<
+    IMatchState,
+    InProgressMatchState>();
+
+builder.Services.AddSingleton<
+    IMatchState,
+    FinishedMatchState>();
+
+builder.Services.AddSingleton<
+    MatchStateFactory>();
 
 var app = builder.Build();
 
