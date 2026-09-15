@@ -11,6 +11,7 @@ using IksOks.Web.Messaging.Contracts;
 using System.Text.Json;
 using IksOks.Web.Infrastructure.Persistence.Entities;
 using IksOks.Web.Domain.Strategies;
+using IksOks.Web.Domain.States;
 
 namespace IksOks.Web.Endpoints;
 
@@ -155,6 +156,7 @@ public static class MatchEndpoints
         Guid matchId,
         ClaimsPrincipal principal,
         IksOksDbContext db,
+        MatchStateFactory stateFactory,
         IHubContext<MatchHub> hub,
         CancellationToken cancellationToken)
     {
@@ -177,18 +179,11 @@ public static class MatchEndpoints
             return Results.Unauthorized();
         }
 
-        var matchState = await db.Matches
+        var match = await db.Matches
             .AsNoTracking()
-            .Where(match => match.Id == matchId)
-            .Select(match => new
-            {
-                match.OwnerUserId,
-                match.OpponentUserId,
-                match.Status
-            })
-            .SingleOrDefaultAsync(cancellationToken);
+            .SingleOrDefaultAsync(match => match.Id == matchId, cancellationToken);
 
-        if (matchState is null)
+        if (match is null)
         {
             return Results.NotFound(new
             {
@@ -196,7 +191,15 @@ public static class MatchEndpoints
             });
         }
 
-        if (matchState.OwnerUserId == userId)
+        if (match is null)
+        {
+            return Results.NotFound(new
+            {
+                error = "Match was not found."
+            });
+        }
+
+        if (match.OwnerUserId == userId)
         {
             return Results.BadRequest(new
             {
@@ -204,8 +207,8 @@ public static class MatchEndpoints
             });
         }
 
-        if (matchState.Status != MatchStatus.WaitingForOpponent ||
-            matchState.OpponentUserId is not null)
+        var state = stateFactory.GetState(match.Status);
+        if (!state.CanJoin(match))
         {
             return Results.Conflict(new
             {
@@ -213,10 +216,12 @@ public static class MatchEndpoints
             });
         }
 
+        var nextStatus = state.OnOpponentJoined();
+
         var updatedRows = await db.Matches
             .Where(match =>
                 match.Id == matchId &&
-                match.Status == MatchStatus.WaitingForOpponent &&
+                match.Status == state.Status &&
                 match.OpponentUserId == null)
             .ExecuteUpdateAsync(
                 setters => setters
@@ -225,7 +230,7 @@ public static class MatchEndpoints
                         userId)
                     .SetProperty(
                         match => match.Status,
-                        MatchStatus.InProgress),
+                        nextStatus),
                 cancellationToken);
 
         if (updatedRows == 0)
@@ -298,6 +303,7 @@ public static class MatchEndpoints
         ClaimsPrincipal principal,
         IksOksDbContext db,
         GameRulesStrategyFactory strategyFactory,
+        MatchStateFactory stateFactory,
         IHubContext<MatchHub> hub,
         CancellationToken cancellationToken)
     {
@@ -328,12 +334,21 @@ public static class MatchEndpoints
             });
         }
 
-        if (match.Status != MatchStatus.InProgress ||
-            match.OpponentUserId is null)
+        var state = stateFactory.GetState(match.Status);
+
+        if (!state.CanMakeMove(match))
         {
             return Results.Conflict(new
             {
                 error = "Match is not in progress."
+            });
+        }
+
+        if (match.OpponentUserId is not Guid opponentUserId)
+        {
+            return Results.Conflict(new
+            {
+                error = "Match does not have an opponent."
             });
         }
 
@@ -370,10 +385,9 @@ public static class MatchEndpoints
             });
         }
 
-        var currentTurnUserId =
-            existingMoves.Count % 2 == 0
-                ? match.OwnerUserId
-                : match.OpponentUserId.Value;
+        var currentTurnUserId = existingMoves.Count % 2 == 0
+            ? match.OwnerUserId
+            : opponentUserId;
 
         if (currentTurnUserId != userId)
         {
@@ -411,7 +425,7 @@ public static class MatchEndpoints
             move,
             match.WinLength))
         {
-            match.Status = MatchStatus.Finished;
+            match.Status = state.OnGameFinished();
             match.WinnerUserId = userId;
             match.FinishedAt =
                 DateTimeOffset.UtcNow;
@@ -420,7 +434,7 @@ public static class MatchEndpoints
             allMoves.Count ==
             match.BoardSize * match.BoardSize)
         {
-            match.Status = MatchStatus.Finished;
+            match.Status = state.OnGameFinished();
             match.WinnerUserId = null;
             match.FinishedAt =
                 DateTimeOffset.UtcNow;
