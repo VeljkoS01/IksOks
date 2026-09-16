@@ -8,6 +8,8 @@ using IksOks.Web.Realtime;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using IksOks.Web.Application.Commands;
+using IksOks.Web.Application.Commands.Matches;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -83,6 +85,12 @@ builder.Services.AddSingleton<
 
 builder.Services.AddSingleton<
     MatchStateFactory>();
+
+builder.Services.AddScoped<
+    ICommandHandler<
+        MakeMoveCommand,
+        MakeMoveCommandResult>,
+        MakeMoveCommandHandler>();
 
 var app = builder.Build();
 

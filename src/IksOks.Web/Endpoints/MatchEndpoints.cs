@@ -6,12 +6,10 @@ using IksOks.Web.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using IksOks.Web.Realtime;
 using Microsoft.AspNetCore.SignalR;
-using IksOks.Web.Messaging;
-using IksOks.Web.Messaging.Contracts;
-using System.Text.Json;
-using IksOks.Web.Infrastructure.Persistence.Entities;
 using IksOks.Web.Domain.Strategies;
 using IksOks.Web.Domain.States;
+using IksOks.Web.Application.Commands;
+using IksOks.Web.Application.Commands.Matches;
 
 namespace IksOks.Web.Endpoints;
 
@@ -298,202 +296,104 @@ public static class MatchEndpoints
     }
 
     private static async Task<IResult> MakeMoveAsync(
-        Guid matchId,
-        MakeMoveRequest request,
-        ClaimsPrincipal principal,
-        IksOksDbContext db,
-        GameRulesStrategyFactory strategyFactory,
-        MatchStateFactory stateFactory,
-        IHubContext<MatchHub> hub,
-        CancellationToken cancellationToken)
+    Guid matchId,
+    MakeMoveRequest request,
+    ClaimsPrincipal principal,
+    ICommandHandler<
+        MakeMoveCommand,
+        MakeMoveCommandResult> handler,
+    IHubContext<MatchHub> hub,
+    CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
             .Value;
 
-        if (!Guid.TryParse(userIdValue, out var userId))
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
         {
             return Results.Unauthorized();
         }
 
-        await using var transaction =
-            await db.Database.BeginTransactionAsync(
+        var command =
+            new MakeMoveCommand(
+                matchId,
+                userId,
+                request.Row,
+                request.Column);
+
+        var result =
+            await handler.HandleAsync(
+                command,
                 cancellationToken);
 
-        var match = await db.Matches
-            .Include(match => match.Moves)
-            .SingleOrDefaultAsync(
-                match => match.Id == matchId,
+        if (!result.IsSuccess)
+        {
+            return result.Failure switch
+            {
+                MakeMoveFailure.MatchNotFound =>
+                    Results.NotFound(new
+                    {
+                        error =
+                            "Match was not found."
+                    }),
+
+                MakeMoveFailure.MatchNotInProgress =>
+                    Results.Conflict(new
+                    {
+                        error =
+                            "Match is not in progress."
+                    }),
+
+                MakeMoveFailure.Forbidden =>
+                    Results.Forbid(),
+
+                MakeMoveFailure.OutsideBoard =>
+                    Results.BadRequest(new
+                    {
+                        error =
+                            "Move is outside of the board."
+                    }),
+
+                MakeMoveFailure.Occupied =>
+                    Results.Conflict(new
+                    {
+                        error =
+                            "Field is already occupied."
+                    }),
+
+                MakeMoveFailure.NotYourTurn =>
+                    Results.Conflict(new
+                    {
+                        error =
+                            "It is not your turn."
+                    }),
+
+                _ =>
+                    Results.Conflict(new
+                    {
+                        error =
+                            "Move could not be completed."
+                    })
+            };
+        }
+
+        var move = result.Move!;
+
+        await hub.Clients
+            .Group(MatchHub.GroupName(matchId))
+            .SendAsync(
+                "MatchUpdated",
+                matchId,
                 cancellationToken);
 
-        if (match is null)
+        if (result.MatchFinished)
         {
-            return Results.NotFound(new
-            {
-                error = "Match was not found."
-            });
-        }
-
-        var state = stateFactory.GetState(match.Status);
-
-        if (!state.CanMakeMove(match))
-        {
-            return Results.Conflict(new
-            {
-                error = "Match is not in progress."
-            });
-        }
-
-        if (match.OpponentUserId is not Guid opponentUserId)
-        {
-            return Results.Conflict(new
-            {
-                error = "Match does not have an opponent."
-            });
-        }
-
-        if (userId != match.OwnerUserId &&
-            userId != match.OpponentUserId)
-        {
-            return Results.Forbid();
-        }
-
-        if (request.Row < 0 ||
-            request.Row >= match.BoardSize ||
-            request.Column < 0 ||
-            request.Column >= match.BoardSize)
-        {
-            return Results.BadRequest(new
-            {
-                error = "Move is outside of the board."
-            });
-        }
-
-        var existingMoves = match.Moves
-            .OrderBy(move => move.MoveNumber)
-            .ToList();
-
-        var occupied = existingMoves.Any(move =>
-            move.Row == request.Row &&
-            move.Column == request.Column);
-
-        if (occupied)
-        {
-            return Results.Conflict(new
-            {
-                error = "Field is already occupied."
-            });
-        }
-
-        var currentTurnUserId = existingMoves.Count % 2 == 0
-            ? match.OwnerUserId
-            : opponentUserId;
-
-        if (currentTurnUserId != userId)
-        {
-            return Results.Conflict(new
-            {
-                error = "It is not your turn."
-            });
-        }
-
-        var symbol =
-            userId == match.OwnerUserId
-                ? "X"
-                : "O";
-
-        var move = new MatchMove
-        {
-            MatchId = match.Id,
-            PlayerUserId = userId,
-            Row = request.Row,
-            Column = request.Column,
-            MoveNumber = existingMoves.Count + 1,
-            Symbol = symbol
-        };
-
-        db.MatchMoves.Add(move);
-
-        var allMoves = existingMoves
-            .Append(move)
-            .ToList();
-
-        var strategy = strategyFactory.GetStrategy(match.Mode);
-
-        if (strategy.IsWinningMove(
-            allMoves,
-            move,
-            match.WinLength))
-        {
-            match.Status = state.OnGameFinished();
-            match.WinnerUserId = userId;
-            match.FinishedAt =
-                DateTimeOffset.UtcNow;
-        }
-        else if (
-            allMoves.Count ==
-            match.BoardSize * match.BoardSize)
-        {
-            match.Status = state.OnGameFinished();
-            match.WinnerUserId = null;
-            match.FinishedAt =
-                DateTimeOffset.UtcNow;
-        }
-
-        if (match.Status == MatchStatus.Finished)
-        {
-            var eventId = Guid.NewGuid();
-
-            var matchFinishedEvent =
-                new MatchFinishedEvent(
-                    eventId,
-                    match.Id,
-                    match.OwnerUserId,
-                    match.OpponentUserId!.Value,
-                    match.WinnerUserId,
-                    match.WinnerUserId is null,
-                    match.BoardSize,
-                    match.WinLength,
-                    match.FinishedAt!.Value);
-
-            var outboxMessage =
-                new OutboxMessage
-                {
-                    Id = eventId,
-                    RoutingKey = "match.finished",
-                    Payload = JsonSerializer.Serialize(
-                        matchFinishedEvent),
-                    OccurredAt = match.FinishedAt.Value
-                };
-
-            db.OutboxMessages.Add(outboxMessage);
-        }
-
-        try
-        {
-            await db.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-
-            await hub.Clients
-                .Group(MatchHub.GroupName(matchId))
+            await hub.Clients.All
                 .SendAsync(
-                    "MatchUpdated",
-                    matchId);
-
-            if (match.Status == MatchStatus.Finished)
-            {
-                await hub.Clients.All
-                    .SendAsync("LobbyUpdated");
-            }
-        }
-        catch (DbUpdateException)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-
-            return Results.Conflict(new
-            {
-                error = "Move could not be completed."
-            });
+                    "LobbyUpdated",
+                    cancellationToken);
         }
 
         return Results.Ok(
