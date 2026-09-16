@@ -30,4 +30,26 @@ public sealed class FinishedMatchState
         throw new InvalidOperationException(
             "The match is already finished.");
     }
+
+    public bool CanPause(GameMatch match)
+    {
+        return false;
+    }
+
+    public bool CanResume(GameMatch match)
+    {
+        return false;
+    }
+
+    public MatchStatus OnPaused()
+    {
+        throw new InvalidOperationException(
+            "A finished match cannot be paused.");
+    }
+
+    public MatchStatus OnResumed()
+    {
+        throw new InvalidOperationException(
+            "A finished match cannot be resumed.");
+    }
 }

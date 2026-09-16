@@ -29,6 +29,10 @@ public static class MatchEndpoints
         group.MapPost("/{matchId:guid}/moves",MakeMoveAsync);
         group.MapGet("/mine/active",GetMyActiveMatchesAsync);
         group.MapGet("/mine/history",GetMyMatchHistoryAsync);
+        group.MapPost("/{matchId:guid}/pause-request",RequestPauseAsync);
+        group.MapPost("/{matchId:guid}/pause",PauseMatchAsync);
+        group.MapPost("/{matchId:guid}/pause-request/reject",RejectPauseRequestAsync);
+        group.MapPost("/{matchId:guid}/resume",ResumeMatchAsync);
 
         return endpoints;
     }
@@ -280,6 +284,7 @@ public static class MatchEndpoints
             .Include(match => match.OpponentUser)
             .Include(match => match.WinnerUser)
             .Include(match => match.Moves)
+            .Include(match => match.PauseRequestedByUser)
             .SingleOrDefaultAsync(
                 match => match.Id == matchId,
                 cancellationToken);
@@ -443,6 +448,9 @@ public static class MatchEndpoints
             match.BoardSize,
             match.WinLength,
             match.Status.ToString(),
+            match.PauseRequestedByUserId,
+            match.PauseRequestedByUser?.UserName,
+            match.PauseRequestedAt,
             currentTurnUserId,
             match.WinnerUserId,
             match.WinnerUser?.UserName,
@@ -473,10 +481,9 @@ public static class MatchEndpoints
                     match.OpponentUserId == userId
                 ) &&
                 (
-                    match.Status ==
-                        MatchStatus.WaitingForOpponent ||
-                    match.Status ==
-                        MatchStatus.InProgress
+                    match.Status == MatchStatus.WaitingForOpponent ||
+                    match.Status == MatchStatus.InProgress ||
+                    match.Status == MatchStatus.Paused
                 ))
             .OrderByDescending(match => match.CreatedAt)
             .Select(match => new UserMatchResponse(
@@ -546,5 +553,226 @@ public static class MatchEndpoints
             .ToListAsync(cancellationToken);
 
         return Results.Ok(matches);
+    }
+
+    private static async Task NotifyMatchChangedAsync(
+    Guid matchId,
+    IHubContext<MatchHub> hub,
+    CancellationToken cancellationToken)
+    {
+        await hub.Clients
+            .Group(MatchHub.GroupName(matchId))
+            .SendAsync(
+                "MatchUpdated",
+                matchId,
+                cancellationToken);
+
+        await hub.Clients.All
+            .SendAsync(
+                "LobbyUpdated",
+                cancellationToken);
+    }
+
+    private static IResult ToMatchControlFailureResult(
+    MatchControlFailure? failure)
+    {
+        return failure switch
+        {
+            MatchControlFailure.MatchNotFound =>
+                Results.NotFound(new
+                {
+                    error = "Match was not found."
+                }),
+
+            MatchControlFailure.Forbidden =>
+                Results.Forbid(),
+
+            MatchControlFailure
+                .PauseRequestAlreadyExists =>
+                Results.Conflict(new
+                {
+                    error =
+                        "A pause request already exists."
+                }),
+
+            MatchControlFailure
+                .PauseRequestNotFound =>
+                Results.Conflict(new
+                {
+                    error =
+                        "There is no pause request."
+                }),
+
+            _ =>
+                Results.Conflict(new
+                {
+                    error =
+                        "This action is not allowed in the current match state."
+                })
+        };
+    }
+
+    private static async Task<IResult> RequestPauseAsync(
+    Guid matchId,
+    ClaimsPrincipal principal,
+    ICommandHandler<
+        RequestPauseCommand,
+        MatchControlCommandResult> handler,
+    IHubContext<MatchHub> hub,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var result =
+            await handler.HandleAsync(
+                new RequestPauseCommand(
+                    matchId,
+                    userId),
+                cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return ToMatchControlFailureResult(
+                result.Failure);
+        }
+
+        await NotifyMatchChangedAsync(
+            matchId,
+            hub,
+            cancellationToken);
+
+        return Results.NoContent();
+    }
+
+
+    private static async Task<IResult> PauseMatchAsync(
+    Guid matchId,
+    ClaimsPrincipal principal,
+    ICommandHandler<
+        PauseMatchCommand,
+        MatchControlCommandResult> handler,
+    IHubContext<MatchHub> hub,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var result =
+            await handler.HandleAsync(
+                new PauseMatchCommand(
+                    matchId,
+                    userId),
+                cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return ToMatchControlFailureResult(
+                result.Failure);
+        }
+
+        await NotifyMatchChangedAsync(
+            matchId,
+            hub,
+            cancellationToken);
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> RejectPauseRequestAsync(
+    Guid matchId,
+    ClaimsPrincipal principal,
+    ICommandHandler<
+        RejectPauseRequestCommand,
+        MatchControlCommandResult> handler,
+    IHubContext<MatchHub> hub,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var result =
+            await handler.HandleAsync(
+                new RejectPauseRequestCommand(
+                    matchId,
+                    userId),
+                cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return ToMatchControlFailureResult(
+                result.Failure);
+        }
+
+        await NotifyMatchChangedAsync(
+            matchId,
+            hub,
+            cancellationToken);
+
+        return Results.NoContent();
+    }
+    private static async Task<IResult> ResumeMatchAsync(
+    Guid matchId,
+    ClaimsPrincipal principal,
+    ICommandHandler<
+        ResumeMatchCommand,
+        MatchControlCommandResult> handler,
+    IHubContext<MatchHub> hub,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var result =
+            await handler.HandleAsync(
+                new ResumeMatchCommand(
+                    matchId,
+                    userId),
+                cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return ToMatchControlFailureResult(
+                result.Failure);
+        }
+
+        await NotifyMatchChangedAsync(
+            matchId,
+            hub,
+            cancellationToken);
+
+        return Results.NoContent();
     }
 }

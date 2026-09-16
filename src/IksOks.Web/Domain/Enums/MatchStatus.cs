@@ -4,5 +4,6 @@ public enum MatchStatus
 {
     WaitingForOpponent,
     InProgress,
+    Paused,
     Finished
 }

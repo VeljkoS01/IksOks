@@ -29,4 +29,25 @@ public sealed class InProgressMatchState
     {
         return MatchStatus.Finished;
     }
+
+    public bool CanPause(GameMatch match)
+    {
+        return match.OpponentUserId is not null;
+    }
+
+    public bool CanResume(GameMatch match)
+    {
+        return false;
+    }
+
+    public MatchStatus OnPaused()
+    {
+        return MatchStatus.Paused;
+    }
+
+    public MatchStatus OnResumed()
+    {
+        throw new InvalidOperationException(
+            "An in-progress match cannot be resumed.");
+    }
 }

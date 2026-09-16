@@ -10,8 +10,15 @@ public interface IMatchState
     bool CanJoin(GameMatch match);
 
     bool CanMakeMove(GameMatch match);
+    bool CanPause(GameMatch match);
+
+    bool CanResume(GameMatch match);
 
     MatchStatus OnOpponentJoined();
 
     MatchStatus OnGameFinished();
+
+    MatchStatus OnPaused();
+
+    MatchStatus OnResumed();
 }

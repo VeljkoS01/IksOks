@@ -84,6 +84,10 @@ builder.Services.AddSingleton<
     FinishedMatchState>();
 
 builder.Services.AddSingleton<
+    IMatchState,
+    PausedMatchState>();
+
+builder.Services.AddSingleton<
     MatchStateFactory>();
 
 builder.Services.AddScoped<
@@ -91,6 +95,31 @@ builder.Services.AddScoped<
         MakeMoveCommand,
         MakeMoveCommandResult>,
         MakeMoveCommandHandler>();
+
+builder.Services.AddScoped<
+    ICommandHandler<
+        RequestPauseCommand,
+        MatchControlCommandResult>,
+    MatchControlCommandHandler>();
+
+builder.Services.AddScoped<
+    ICommandHandler<
+        PauseMatchCommand,
+        MatchControlCommandResult>,
+    MatchControlCommandHandler>();
+
+builder.Services.AddScoped<
+    ICommandHandler<
+        RejectPauseRequestCommand,
+        MatchControlCommandResult>,
+    MatchControlCommandHandler>();
+
+builder.Services.AddScoped<
+    ICommandHandler<
+        ResumeMatchCommand,
+        MatchControlCommandResult>,
+    MatchControlCommandHandler>();
+
 
 var app = builder.Build();
 
