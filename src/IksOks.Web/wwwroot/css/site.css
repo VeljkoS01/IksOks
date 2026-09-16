@@ -325,3 +325,24 @@ input {
         grid-template-columns: 1fr;
     }
 }
+
+.match-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.match-control-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+}
+
+.pause-request-text {
+    margin: 0;
+    font-weight: 600;
+    text-align: center;
+}
