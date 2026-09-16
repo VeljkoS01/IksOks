@@ -27,6 +27,7 @@ const activeMatchesList = document.querySelector("#active-matches-list");
 const matchHistoryList = document.querySelector("#match-history-list");
 const refreshMyMatchesButton = document.querySelector("#refresh-my-matches-button");
 const matchModeInput = document.querySelector("#match-mode");
+const matchControls = document.querySelector("#match-controls");
 
 let mode = "login";
 let currentUser = null;
@@ -458,6 +459,8 @@ function renderMatch(match) {
     renderBoard(match);
 
     updateMatchStatus(match);
+
+    renderMatchControls(match);
 }
 
 function renderBoard(match) {
@@ -527,6 +530,21 @@ function updateMatchStatus(match) {
 
         gameMessage.textContent =
             "Meč će početi kada se drugi igrač pridruži.";
+
+        return;
+    }
+
+    if (match.status === "Paused") {
+        matchStatus.textContent =
+            "Meč je pauziran.";
+
+        if (match.ownerUserId === currentUser.id) {
+            gameMessage.textContent =
+                "Možete nastaviti meč kada budete spremni.";
+        } else {
+            gameMessage.textContent =
+                "Sačekajte da vlasnik meča nastavi partiju.";
+        }
 
         return;
     }
@@ -923,10 +941,15 @@ function renderActiveMatches(matches) {
 
         details.className = "match-details";
 
-        const statusText =
-            match.status === "InProgress"
-                ? "U toku"
-                : "Čeka protivnika";
+        let statusText;
+
+        if (match.status === "InProgress") {
+            statusText = "U toku";
+        } else if (match.status === "Paused") {
+            statusText = "Pauziran";
+        } else {
+            statusText = "Čeka protivnika";
+        }
 
         const modeText =
             match.mode === "Classic"
@@ -948,9 +971,9 @@ function renderActiveMatches(matches) {
         button.type = "button";
 
         button.textContent =
-            match.status === "InProgress"
-                ? "Nastavi"
-                : "Otvori";
+            match.status === "WaitingForOpponent"
+                ? "Otvori"
+                : "Nastavi";
 
         button.addEventListener(
             "click",
@@ -1122,3 +1145,184 @@ matchModeInput.addEventListener(
     updateMatchModeFields);
 
 updateMatchModeFields();
+
+function renderMatchControls(match) {
+    matchControls.replaceChildren();
+
+    const isOwner =
+        match.ownerUserId === currentUser.id;
+
+    const isOpponent =
+        match.opponentUserId === currentUser.id;
+
+    if (match.status === "InProgress") {
+        if (isOwner) {
+            renderOwnerInProgressControls(match);
+            return;
+        }
+
+        if (isOpponent) {
+            renderOpponentInProgressControls(match);
+        }
+
+        return;
+    }
+
+    if (
+        match.status === "Paused" &&
+        isOwner
+    ) {
+        const resumeButton =
+            createControlButton(
+                "Nastavi meč",
+                resumeMatch);
+
+        matchControls.append(
+            resumeButton);
+    }
+}
+
+function createControlButton(
+    text,
+    action) {
+    const button =
+        document.createElement("button");
+
+    button.type = "button";
+    button.className = "secondary-button";
+    button.textContent = text;
+
+    button.addEventListener(
+        "click",
+        async () => {
+            button.disabled = true;
+
+            try {
+                await action();
+            } finally {
+                button.disabled = false;
+            }
+        });
+
+    return button;
+}
+
+function renderOwnerInProgressControls(match) {
+    if (match.pauseRequestedByUserId) {
+        const requestText =
+            document.createElement("p");
+
+        requestText.className =
+            "pause-request-text";
+
+        requestText.textContent =
+            `${match.pauseRequestedByUserName}` +
+            " je zatražio pauzu.";
+
+        const actions =
+            document.createElement("div");
+
+        actions.className =
+            "match-control-actions";
+
+        const acceptButton =
+            createControlButton(
+                "Prihvati pauzu",
+                pauseMatch);
+
+        const rejectButton =
+            createControlButton(
+                "Odbij zahtev",
+                rejectPauseRequest);
+
+        actions.append(
+            acceptButton,
+            rejectButton);
+
+        matchControls.append(
+            requestText,
+            actions);
+
+        return;
+    }
+
+    const pauseButton =
+        createControlButton(
+            "Pauziraj meč",
+            pauseMatch);
+
+    matchControls.append(
+        pauseButton);
+}
+
+function renderOpponentInProgressControls(match) {
+    if (
+        match.pauseRequestedByUserId ===
+        currentUser.id
+    ) {
+        const text =
+            document.createElement("p");
+
+        text.className =
+            "pause-request-text";
+
+        text.textContent =
+            "Zahtev za pauzu je poslat.";
+
+        matchControls.append(text);
+        return;
+    }
+
+    const requestButton =
+        createControlButton(
+            "Zatraži pauzu",
+            requestPause);
+
+    matchControls.append(
+        requestButton);
+}
+
+async function postMatchControl(path) {
+    if (!activeMatchId) {
+        return;
+    }
+
+    const response = await fetch(
+        `/api/matches/${activeMatchId}/${path}`,
+        {
+            method: "POST"
+        });
+
+    if (!response.ok) {
+        const error =
+            await readError(response);
+
+        gameMessage.textContent = error;
+
+        await loadActiveMatch();
+
+        return;
+    }
+
+    await loadActiveMatch();
+}
+
+async function requestPause() {
+    await postMatchControl(
+        "pause-request");
+}
+
+async function pauseMatch() {
+    await postMatchControl(
+        "pause");
+}
+
+async function rejectPauseRequest() {
+    await postMatchControl(
+        "pause-request/reject");
+}
+
+async function resumeMatch() {
+    await postMatchControl(
+        "resume");
+}
