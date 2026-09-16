@@ -84,6 +84,11 @@ public sealed class IksOksDbContext : DbContext
             .HasMaxLength(32)
             .IsRequired();
 
+        match.HasOne(x => x.PauseRequestedByUser)
+            .WithMany()
+            .HasForeignKey(x => x.PauseRequestedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         var move = modelBuilder.Entity<MatchMove>();
 
         move.ToTable("MatchMoves");

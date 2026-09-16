@@ -1,4 +1,4 @@
-﻿namespace IksOks.Web.Contracts.Matches;
+﻿using IksOks.Web.Contracts.Matches;
 
 public sealed record MatchDetailsResponse(
     Guid Id,
@@ -10,6 +10,9 @@ public sealed record MatchDetailsResponse(
     int BoardSize,
     int WinLength,
     string Status,
+    Guid? PauseRequestedByUserId,
+    string? PauseRequestedByUserName,
+    DateTimeOffset? PauseRequestedAt,
     Guid? CurrentTurnUserId,
     Guid? WinnerUserId,
     string? WinnerUserName,

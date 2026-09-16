@@ -34,4 +34,10 @@ public sealed class GameMatch
         = new List<MatchMove>();
     public MatchMode Mode { get; set; }
     = MatchMode.Classic;
+
+    public Guid? PauseRequestedByUserId { get; set; }
+
+    public AppUser? PauseRequestedByUser { get; set; }
+
+    public DateTimeOffset? PauseRequestedAt { get; set; }
 }
