@@ -16,6 +16,8 @@ public sealed record MatchDetailsResponse(
     Guid? ResumeRequestedByUserId,
     string? ResumeRequestedByUserName,
     DateTimeOffset? ResumeRequestedAt,
+    int TurnDurationSeconds,
+    DateTimeOffset? TurnDeadlineAt,
     Guid? CurrentTurnUserId,
     Guid? WinnerUserId,
     string? WinnerUserName,

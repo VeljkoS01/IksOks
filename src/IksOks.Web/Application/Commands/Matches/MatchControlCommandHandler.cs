@@ -86,13 +86,12 @@ public sealed class MatchControlCommandHandler
     }
 
     public async Task<MatchControlCommandResult> HandleAsync(
-        PauseMatchCommand command,
-        CancellationToken cancellationToken)
+    PauseMatchCommand command,
+    CancellationToken cancellationToken)
     {
         var match = await _db.Matches
             .SingleOrDefaultAsync(
-                match =>
-                    match.Id == command.MatchId,
+                match => match.Id == command.MatchId,
                 cancellationToken);
 
         if (match is null)
@@ -116,11 +115,29 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.InvalidState);
         }
 
+        if (match.TurnDeadlineAt is not null)
+        {
+            var remaining =
+                match.TurnDeadlineAt.Value -
+                DateTimeOffset.UtcNow;
+
+            match.PausedTurnSecondsRemaining =
+                Math.Max(
+                    0,
+                    (int)Math.Ceiling(
+                        remaining.TotalSeconds));
+        }
+
+        match.TurnDeadlineAt = null;
+
         match.Status =
             state.OnPaused();
 
         match.PauseRequestedByUserId = null;
         match.PauseRequestedAt = null;
+
+        match.ResumeRequestedByUserId = null;
+        match.ResumeRequestedAt = null;
 
         await _db.SaveChangesAsync(
             cancellationToken);
@@ -176,13 +193,12 @@ public sealed class MatchControlCommandHandler
     }
 
     public async Task<MatchControlCommandResult> HandleAsync(
-        ResumeMatchCommand command,
-        CancellationToken cancellationToken)
+    ResumeMatchCommand command,
+    CancellationToken cancellationToken)
     {
         var match = await _db.Matches
             .SingleOrDefaultAsync(
-                match =>
-                    match.Id == command.MatchId,
+                match => match.Id == command.MatchId,
                 cancellationToken);
 
         if (match is null)
@@ -206,8 +222,18 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.InvalidState);
         }
 
+        var remainingSeconds =
+            match.PausedTurnSecondsRemaining
+            ?? match.TurnDurationSeconds;
+
         match.Status =
             state.OnResumed();
+
+        match.TurnDeadlineAt =
+            DateTimeOffset.UtcNow.AddSeconds(
+                remainingSeconds);
+
+        match.PausedTurnSecondsRemaining = null;
 
         match.ResumeRequestedByUserId = null;
         match.ResumeRequestedAt = null;
