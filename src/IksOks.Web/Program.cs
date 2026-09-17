@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using IksOks.Web.Application.Commands;
 using IksOks.Web.Application.Commands.Matches;
+using IksOks.Web.Application.Background;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -131,6 +132,9 @@ builder.Services.AddScoped<
         RejectResumeRequestCommand,
         MatchControlCommandResult>,
     MatchControlCommandHandler>();
+
+builder.Services.AddHostedService<
+    MatchTimeoutWorker>();
 
 
 var app = builder.Build();

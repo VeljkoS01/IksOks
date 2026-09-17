@@ -46,4 +46,10 @@ public sealed class GameMatch
     public AppUser? ResumeRequestedByUser { get; set; }
 
     public DateTimeOffset? ResumeRequestedAt { get; set; }
+
+    public int TurnDurationSeconds { get; set; } = 30;
+
+    public DateTimeOffset? TurnDeadlineAt { get; set; }
+
+    public int? PausedTurnSecondsRemaining { get; set; }
 }

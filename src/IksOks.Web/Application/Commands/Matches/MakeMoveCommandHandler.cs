@@ -160,6 +160,13 @@ public sealed class MakeMoveCommandHandler
                 DateTimeOffset.UtcNow;
         }
 
+        if (match.Status == MatchStatus.InProgress)
+        {
+            match.TurnDeadlineAt =
+                DateTimeOffset.UtcNow.AddSeconds(
+                    match.TurnDurationSeconds);
+        }
+
         var matchFinished =
             match.Status == MatchStatus.Finished;
 

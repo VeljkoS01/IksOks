@@ -222,6 +222,8 @@ public static class MatchEndpoints
 
         var nextStatus = state.OnOpponentJoined();
 
+        var firstTurnDeadline = DateTimeOffset.UtcNow.AddSeconds(30);
+
         var updatedRows = await db.Matches
             .Where(match =>
                 match.Id == matchId &&
@@ -234,7 +236,10 @@ public static class MatchEndpoints
                         userId)
                     .SetProperty(
                         match => match.Status,
-                        nextStatus),
+                        nextStatus)
+                    .SetProperty(
+                        match => match.TurnDeadlineAt,
+                        firstTurnDeadline),
                 cancellationToken);
 
         if (updatedRows == 0)
@@ -457,6 +462,8 @@ public static class MatchEndpoints
             match.ResumeRequestedByUserId,
             match.ResumeRequestedByUser?.UserName,
             match.ResumeRequestedAt,
+            match.TurnDurationSeconds,
+            match.TurnDeadlineAt,
             currentTurnUserId,
             match.WinnerUserId,
             match.WinnerUser?.UserName,
