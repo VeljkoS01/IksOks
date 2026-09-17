@@ -33,6 +33,8 @@ public static class MatchEndpoints
         group.MapPost("/{matchId:guid}/pause",PauseMatchAsync);
         group.MapPost("/{matchId:guid}/pause-request/reject",RejectPauseRequestAsync);
         group.MapPost("/{matchId:guid}/resume",ResumeMatchAsync);
+        group.MapPost("/{matchId:guid}/resume-request", RequestResumeAsync);
+        group.MapPost("/{matchId:guid}/resume-request/reject", RejectResumeRequestAsync);
 
         return endpoints;
     }
@@ -285,6 +287,7 @@ public static class MatchEndpoints
             .Include(match => match.WinnerUser)
             .Include(match => match.Moves)
             .Include(match => match.PauseRequestedByUser)
+            .Include(match => match.ResumeRequestedByUser)
             .SingleOrDefaultAsync(
                 match => match.Id == matchId,
                 cancellationToken);
@@ -451,6 +454,9 @@ public static class MatchEndpoints
             match.PauseRequestedByUserId,
             match.PauseRequestedByUser?.UserName,
             match.PauseRequestedAt,
+            match.ResumeRequestedByUserId,
+            match.ResumeRequestedByUser?.UserName,
+            match.ResumeRequestedAt,
             currentTurnUserId,
             match.WinnerUserId,
             match.WinnerUser?.UserName,
@@ -761,6 +767,86 @@ public static class MatchEndpoints
                     matchId,
                     userId),
                 cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return ToMatchControlFailureResult(
+                result.Failure);
+        }
+
+        await NotifyMatchChangedAsync(
+            matchId,
+            hub,
+            cancellationToken);
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> RequestResumeAsync(
+    Guid matchId,
+    ClaimsPrincipal principal,
+    ICommandHandler<
+        RequestResumeCommand,
+        MatchControlCommandResult> handler,
+    IHubContext<MatchHub> hub,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var result = await handler.HandleAsync(
+            new RequestResumeCommand(
+                matchId,
+                userId),
+            cancellationToken);
+
+        if (!result.IsSuccess)
+        {
+            return ToMatchControlFailureResult(
+                result.Failure);
+        }
+
+        await NotifyMatchChangedAsync(
+            matchId,
+            hub,
+            cancellationToken);
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> RejectResumeRequestAsync(
+    Guid matchId,
+    ClaimsPrincipal principal,
+    ICommandHandler<
+        RejectResumeRequestCommand,
+        MatchControlCommandResult> handler,
+    IHubContext<MatchHub> hub,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var result = await handler.HandleAsync(
+            new RejectResumeRequestCommand(
+                matchId,
+                userId),
+            cancellationToken);
 
         if (!result.IsSuccess)
         {

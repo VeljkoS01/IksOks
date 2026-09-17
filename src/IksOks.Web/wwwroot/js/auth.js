@@ -1168,10 +1168,18 @@ function renderMatchControls(match) {
         return;
     }
 
-    if (
-        match.status === "Paused" &&
-        isOwner
-    ) {
+    if (match.status === "Paused") {
+        if (isOwner) {
+            renderOwnerPausedControls(match);
+            return;
+        }
+
+        if (isOpponent) {
+            renderOpponentPausedControls(match);
+        }
+
+        return;
+    } {
         const resumeButton =
             createControlButton(
                 "Nastavi meč",
@@ -1282,6 +1290,75 @@ function renderOpponentInProgressControls(match) {
         requestButton);
 }
 
+function renderOwnerPausedControls(match) {
+    if (match.resumeRequestedByUserId) {
+        const text =
+            document.createElement("p");
+
+        text.className =
+            "pause-request-text";
+
+        text.textContent =
+            `${match.resumeRequestedByUserName}` +
+            " je zatražio nastavak.";
+
+        const actions =
+            document.createElement("div");
+
+        actions.className =
+            "match-control-actions";
+
+        const acceptButton =
+            createControlButton(
+                "Prihvati nastavak",
+                resumeMatch);
+
+        const rejectButton =
+            createControlButton(
+                "Odbij zahtev",
+                rejectResumeRequest);
+
+        actions.append(
+            acceptButton,
+            rejectButton);
+
+        matchControls.append(
+            text,
+            actions);
+
+        return;
+    }
+
+    matchControls.append(
+        createControlButton(
+            "Nastavi meč",
+            resumeMatch));
+}
+
+function renderOpponentPausedControls(match) {
+    if (
+        match.resumeRequestedByUserId ===
+        currentUser.id
+    ) {
+        const text =
+            document.createElement("p");
+
+        text.className =
+            "pause-request-text";
+
+        text.textContent =
+            "Zahtev za nastavak je poslat.";
+
+        matchControls.append(text);
+        return;
+    }
+
+    matchControls.append(
+        createControlButton(
+            "Zatraži nastavak",
+            requestResume));
+}
+
 async function postMatchControl(path) {
     if (!activeMatchId) {
         return;
@@ -1325,4 +1402,14 @@ async function rejectPauseRequest() {
 async function resumeMatch() {
     await postMatchControl(
         "resume");
+}
+
+async function requestResume() {
+    await postMatchControl(
+        "resume-request");
+}
+
+async function rejectResumeRequest() {
+    await postMatchControl(
+        "resume-request/reject");
 }

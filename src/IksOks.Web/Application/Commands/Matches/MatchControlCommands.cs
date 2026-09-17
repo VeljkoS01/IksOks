@@ -21,3 +21,13 @@ public sealed record ResumeMatchCommand(
     Guid MatchId,
     Guid UserId)
     : ICommand<MatchControlCommandResult>;
+
+public sealed record RequestResumeCommand(
+    Guid MatchId,
+    Guid UserId)
+    : ICommand<MatchControlCommandResult>;
+
+public sealed record RejectResumeRequestCommand(
+    Guid MatchId,
+    Guid UserId)
+    : ICommand<MatchControlCommandResult>;

@@ -40,4 +40,10 @@ public sealed class GameMatch
     public AppUser? PauseRequestedByUser { get; set; }
 
     public DateTimeOffset? PauseRequestedAt { get; set; }
+
+    public Guid? ResumeRequestedByUserId { get; set; }
+
+    public AppUser? ResumeRequestedByUser { get; set; }
+
+    public DateTimeOffset? ResumeRequestedAt { get; set; }
 }
