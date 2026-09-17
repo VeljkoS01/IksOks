@@ -6,7 +6,9 @@ public enum MatchControlFailure
     Forbidden,
     InvalidState,
     PauseRequestAlreadyExists,
-    PauseRequestNotFound
+    PauseRequestNotFound,
+    ResumeRequestAlreadyExists,
+    ResumeRequestNotFound
 }
 
 public sealed record MatchControlCommandResult(

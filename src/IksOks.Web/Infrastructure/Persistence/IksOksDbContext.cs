@@ -89,6 +89,11 @@ public sealed class IksOksDbContext : DbContext
             .HasForeignKey(x => x.PauseRequestedByUserId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        match.HasOne(x => x.ResumeRequestedByUser)
+            .WithMany()
+            .HasForeignKey(x => x.ResumeRequestedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         var move = modelBuilder.Entity<MatchMove>();
 
         move.ToTable("MatchMoves");

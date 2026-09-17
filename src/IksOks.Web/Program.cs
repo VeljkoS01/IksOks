@@ -120,6 +120,18 @@ builder.Services.AddScoped<
         MatchControlCommandResult>,
     MatchControlCommandHandler>();
 
+builder.Services.AddScoped<
+    ICommandHandler<
+        RequestResumeCommand,
+        MatchControlCommandResult>,
+    MatchControlCommandHandler>();
+
+builder.Services.AddScoped<
+    ICommandHandler<
+        RejectResumeRequestCommand,
+        MatchControlCommandResult>,
+    MatchControlCommandHandler>();
+
 
 var app = builder.Build();
 
