@@ -28,12 +28,16 @@ const matchHistoryList = document.querySelector("#match-history-list");
 const refreshMyMatchesButton = document.querySelector("#refresh-my-matches-button");
 const matchModeInput = document.querySelector("#match-mode");
 const matchControls = document.querySelector("#match-controls");
+const turnTimer = document.querySelector("#turn-timer");
+
 
 let mode = "login";
 let currentUser = null;
 let activeMatchId = null;
 let hubConnection = null;
 let hubStartPromise = null;
+let timerIntervalId = null;
+let currentDeadline = null;
 
 loginTab.addEventListener("click", () => {
     setMode("login");
@@ -177,8 +181,28 @@ async function checkCurrentUser() {
     showAuthenticatedUser(user);
 }
 
+function resetMatchView() {
+    stopTurnTimer();
+
+    activeMatchId = null;
+
+    turnTimer.textContent = "";
+    matchControls.replaceChildren();
+    gameBoard.replaceChildren();
+
+    matchTitle.textContent = "";
+    matchStatus.textContent = "";
+    playerSymbol.textContent = "";
+    gameMessage.textContent = "";
+
+    matchView.classList.add("hidden");
+    lobbyView.classList.remove("hidden");
+}
+
 function showAuthenticatedUser(user) {
     currentUser = user;
+
+    resetMatchView();
 
     authPage.classList.add("hidden");
     appPage.classList.remove("hidden");
@@ -194,6 +218,7 @@ function showAuthenticatedUser(user) {
 }
 
 function showAuthPage() {
+    stopTurnTimer();
     activeMatchId = null;
     currentUser = null;
 
@@ -459,6 +484,7 @@ function renderMatch(match) {
     renderBoard(match);
 
     updateMatchStatus(match);
+    updateTurnTimer(match);
 
     renderMatchControls(match);
 }
@@ -630,6 +656,7 @@ backToLobbyButton.addEventListener(
     });
 
 async function closeMatch() {
+    stopTurnTimer();
     const matchId = activeMatchId;
 
     activeMatchId = null;
@@ -967,13 +994,16 @@ function renderActiveMatches(matches) {
         const button =
             document.createElement("button");
 
-        button.className = "secondary-button";
         button.type = "button";
+        button.className = "secondary-button";
 
-        button.textContent =
-            match.status === "WaitingForOpponent"
-                ? "Otvori"
-                : "Nastavi";
+        if (match.status === "WaitingForOpponent") {
+            button.textContent = "Otvori meč";
+        } else if (match.status === "Paused") {
+            button.textContent = "Otvori meč";
+        } else {
+            button.textContent = "Nastavi meč";
+        }
 
         button.addEventListener(
             "click",
@@ -1179,14 +1209,6 @@ function renderMatchControls(match) {
         }
 
         return;
-    } {
-        const resumeButton =
-            createControlButton(
-                "Nastavi meč",
-                resumeMatch);
-
-        matchControls.append(
-            resumeButton);
     }
 }
 
@@ -1359,6 +1381,62 @@ function renderOpponentPausedControls(match) {
             requestResume));
 }
 
+function updateTurnTimer(match) {
+    stopTurnTimer();
+
+    if (
+        match.status !== "InProgress" ||
+        !match.turnDeadlineAt
+    ) {
+        turnTimer.textContent = "";
+        return;
+    }
+
+    currentDeadline =
+        new Date(match.turnDeadlineAt);
+
+    renderRemainingTime();
+
+    timerIntervalId =
+        window.setInterval(
+            renderRemainingTime,
+            250);
+}
+
+function renderRemainingTime() {
+    if (!currentDeadline) {
+        return;
+    }
+
+    const milliseconds =
+        currentDeadline.getTime() -
+        Date.now();
+
+    const seconds =
+        Math.max(
+            0,
+            Math.ceil(
+                milliseconds / 1000));
+
+    turnTimer.textContent =
+        `Vreme: ${seconds}s`;
+
+    if (seconds === 0) {
+        stopTurnTimer();
+    }
+}
+
+function stopTurnTimer() {
+    if (timerIntervalId !== null) {
+        window.clearInterval(
+            timerIntervalId);
+
+        timerIntervalId = null;
+    }
+
+    currentDeadline = null;
+}
+
 async function postMatchControl(path) {
     if (!activeMatchId) {
         return;
@@ -1413,3 +1491,4 @@ async function rejectResumeRequest() {
     await postMatchControl(
         "resume-request/reject");
 }
+
