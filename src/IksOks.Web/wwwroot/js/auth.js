@@ -15,6 +15,10 @@ const winLengthInput = document.querySelector("#win-length");
 const matchMessage = document.querySelector("#match-message");
 const matchesList = document.querySelector("#matches-list");
 const refreshMatchesButton = document.querySelector("#refresh-matches-button");
+const profileSummary = document.querySelector("#profile-summary");
+const refreshProfileButton = document.querySelector("#refresh-profile-button");
+const leaderboardList = document.querySelector("#leaderboard-list");
+const refreshLeaderboardButton = document.querySelector("#refresh-leaderboard-button");
 const lobbyView = document.querySelector("#lobby-view");
 const matchView = document.querySelector("#match-view");
 const matchTitle = document.querySelector("#match-title");
@@ -217,6 +221,8 @@ function showAuthenticatedUser(user) {
     void loadMatches();
     void loadMyMatches();
     void loadLiveMatches();
+    void loadProfile();
+    void loadLeaderboard();
     void ensureRealtimeConnected();
 }
 
@@ -229,6 +235,8 @@ function showAuthPage() {
     activeMatchesList.replaceChildren();
     liveMatchesList.replaceChildren();
     matchHistoryList.replaceChildren();
+    profileSummary.replaceChildren();
+    leaderboardList.replaceChildren();
 
     appPage.classList.add("hidden");
     authPage.classList.remove("hidden");
@@ -697,7 +705,9 @@ async function closeMatch() {
     await Promise.all([
         loadMatches(),
         loadMyMatches(),
-        loadLiveMatches()
+        loadLiveMatches(),
+        loadProfile(),
+        loadLeaderboard()
     ]);
 }
 
@@ -747,7 +757,9 @@ function createHubConnection() {
             await Promise.all([
                 loadMatches(),
                 loadMyMatches(),
-                loadLiveMatches()
+                loadLiveMatches(),
+                loadProfile(),
+                loadLeaderboard()
             ]);
         });
 
@@ -757,7 +769,13 @@ function createHubConnection() {
                 await joinMatchGroup(
                     activeMatchId);
             } else if (currentUser) {
-                await loadMatches();
+                await Promise.all([
+                    loadMatches(),
+                    loadMyMatches(),
+                    loadLiveMatches(),
+                    loadProfile(),
+                    loadLeaderboard()
+                ]);
             }
         });
 
@@ -881,6 +899,221 @@ async function stopRealtimeConnection() {
 
     hubConnection = null;
     hubStartPromise = null;
+}
+
+async function loadProfile() {
+    try {
+        const response =
+            await fetch("/api/users/me/profile");
+
+        if (!response.ok) {
+            return;
+        }
+
+        const profile =
+            await response.json();
+
+        renderProfile(profile);
+    } catch (error) {
+        console.error(
+            "Could not load profile:",
+            error);
+
+        profileSummary.replaceChildren();
+
+        const message =
+            document.createElement("p");
+
+        message.className = "empty-state";
+        message.textContent =
+            "Nije moguće učitati profil.";
+
+        profileSummary.append(message);
+    }
+}
+
+function renderProfile(profile) {
+    profileSummary.replaceChildren();
+
+    const userName =
+        document.createElement("p");
+
+    userName.className =
+        "profile-user-name";
+
+    userName.textContent =
+        profile.userName;
+
+    const memberSince =
+        document.createElement("p");
+
+    memberSince.className =
+        "profile-member-since";
+
+    memberSince.textContent =
+        "Član od: " +
+        new Date(profile.memberSince)
+            .toLocaleDateString("sr-RS");
+
+    const stats =
+        document.createElement("div");
+
+    stats.className =
+        "profile-stats-grid";
+
+    const values = [
+        ["Odigrano", profile.matchesPlayed],
+        ["Pobede", profile.wins],
+        ["Nerešeno", profile.draws],
+        ["Porazi", profile.losses],
+        ["Poeni", profile.points],
+        ["Win rate", `${profile.winRate}%`]
+    ];
+
+    for (const [label, value] of values) {
+        const stat =
+            document.createElement("div");
+
+        stat.className =
+            "profile-stat";
+
+        const strong =
+            document.createElement("strong");
+
+        strong.textContent = value;
+
+        const text =
+            document.createElement("span");
+
+        text.textContent = label;
+
+        stat.append(
+            strong,
+            text);
+
+        stats.append(stat);
+    }
+
+    profileSummary.append(
+        userName,
+        memberSince,
+        stats);
+}
+
+async function loadLeaderboard() {
+    try {
+        const response =
+            await fetch("/api/users/leaderboard");
+
+        if (!response.ok) {
+            return;
+        }
+
+        const entries =
+            await response.json();
+
+        renderLeaderboard(entries);
+    } catch (error) {
+        console.error(
+            "Could not load leaderboard:",
+            error);
+
+        leaderboardList.replaceChildren();
+
+        const message =
+            document.createElement("p");
+
+        message.className = "empty-state";
+        message.textContent =
+            "Nije moguće učitati rang listu.";
+
+        leaderboardList.append(message);
+    }
+}
+
+function renderLeaderboard(entries) {
+    leaderboardList.replaceChildren();
+
+    if (entries.length === 0) {
+        const empty =
+            document.createElement("p");
+
+        empty.className = "empty-state";
+        empty.textContent =
+            "Još nema rezultata za rang listu.";
+
+        leaderboardList.append(empty);
+        return;
+    }
+
+    for (const entry of entries) {
+        const row =
+            document.createElement("div");
+
+        row.className =
+            "leaderboard-row";
+
+        if (
+            currentUser &&
+            entry.userId === currentUser.id
+        ) {
+            row.classList.add(
+                "leaderboard-self");
+        }
+
+        const rank =
+            document.createElement("span");
+
+        rank.className =
+            "leaderboard-rank";
+
+        rank.textContent =
+            `#${entry.rank}`;
+
+        const player =
+            document.createElement("div");
+
+        player.className =
+            "leaderboard-player";
+
+        const name =
+            document.createElement("strong");
+
+        name.textContent =
+            entry.userName;
+
+        const details =
+            document.createElement("span");
+
+        details.className =
+            "leaderboard-details";
+
+        details.textContent =
+            `${entry.wins}P · ` +
+            `${entry.draws}N · ` +
+            `${entry.losses}I · ` +
+            `${entry.matchesPlayed} mečeva`;
+
+        player.append(
+            name,
+            details);
+
+        const points =
+            document.createElement("span");
+
+        points.className =
+            "leaderboard-points";
+
+        points.textContent =
+            `${entry.points} poena`;
+
+        row.append(
+            rank,
+            player,
+            points);
+
+        leaderboardList.append(row);
+    }
 }
 
 async function loadLiveMatches() {
@@ -1271,6 +1504,14 @@ refreshMyMatchesButton.addEventListener(
 refreshLiveMatchesButton.addEventListener(
     "click",
     loadLiveMatches);
+
+refreshProfileButton.addEventListener(
+    "click",
+    loadProfile);
+
+refreshLeaderboardButton.addEventListener(
+    "click",
+    loadLeaderboard);
 
 function updateMatchModeFields() {
     const mode = matchModeInput.value;
