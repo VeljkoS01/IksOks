@@ -155,6 +155,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapAuthEndpoints();
 app.MapMatchEndpoints();
+app.MapUserEndpoints();
 app.MapHub<MatchHub>("/hubs/match")
     .RequireAuthorization();
 
