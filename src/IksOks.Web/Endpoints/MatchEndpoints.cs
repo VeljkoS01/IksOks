@@ -29,6 +29,7 @@ public static class MatchEndpoints
         group.MapPost("/{matchId:guid}/moves",MakeMoveAsync);
         group.MapGet("/mine/active",GetMyActiveMatchesAsync);
         group.MapGet("/mine/history",GetMyMatchHistoryAsync);
+        group.MapGet("/live", GetLiveMatchesAsync);
         group.MapPost("/{matchId:guid}/pause-request",RequestPauseAsync);
         group.MapPost("/{matchId:guid}/pause",PauseMatchAsync);
         group.MapPost("/{matchId:guid}/pause-request/reject",RejectPauseRequestAsync);
@@ -470,6 +471,51 @@ public static class MatchEndpoints
             match.CreatedAt,
             match.FinishedAt,
             moves);
+    }
+
+    private static async Task<IResult> GetLiveMatchesAsync(
+    ClaimsPrincipal principal,
+    IksOksDbContext db,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var matches = await db.Matches
+            .AsNoTracking()
+            .Where(match =>
+                match.OpponentUserId != null &&
+                (
+                    match.Status == MatchStatus.InProgress ||
+                    match.Status == MatchStatus.Paused
+                ) &&
+                match.OwnerUserId != userId &&
+                match.OpponentUserId != userId)
+            .OrderByDescending(
+                match => match.CreatedAt)
+            .Select(match =>
+                new LiveMatchResponse(
+                    match.Id,
+                    match.OwnerUserId,
+                    match.OwnerUser.UserName,
+                    match.OpponentUserId!.Value,
+                    match.OpponentUser!.UserName,
+                    match.Mode.ToString(),
+                    match.BoardSize,
+                    match.WinLength,
+                    match.Status.ToString(),
+                    match.CreatedAt))
+            .ToListAsync(cancellationToken);
+
+        return Results.Ok(matches);
     }
 
     private static async Task<IResult> GetMyActiveMatchesAsync(

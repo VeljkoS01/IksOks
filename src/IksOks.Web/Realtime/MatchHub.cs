@@ -1,4 +1,5 @@
 ﻿using System.Security.Claims;
+using IksOks.Web.Domain.Enums;
 using IksOks.Web.Infrastructure.Persistence;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -31,18 +32,28 @@ public sealed class MatchHub : Hub
                 "Authenticated user was not found.");
         }
 
-        var canJoin = await _db.Matches
+        var match = await _db.Matches
             .AsNoTracking()
-            .AnyAsync(
-                match =>
-                    match.Id == matchId &&
-                    (
-                        match.OwnerUserId == userId ||
-                        match.OpponentUserId == userId
-                    ),
+            .SingleOrDefaultAsync(
+                match => match.Id == matchId,
                 Context.ConnectionAborted);
 
-        if (!canJoin)
+        if (match is null)
+        {
+            throw new HubException(
+                "Match was not found.");
+        }
+
+        var isParticipant =
+            match.OwnerUserId == userId ||
+            match.OpponentUserId == userId;
+
+        var canSpectate =
+            match.Status == MatchStatus.InProgress ||
+            match.Status == MatchStatus.Paused ||
+            match.Status == MatchStatus.Finished;
+
+        if (!isParticipant && !canSpectate)
         {
             throw new HubException(
                 "You do not have access to this match.");
