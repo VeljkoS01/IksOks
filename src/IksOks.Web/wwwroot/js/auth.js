@@ -26,6 +26,8 @@ const backToLobbyButton = document.querySelector("#back-to-lobby-button");
 const activeMatchesList = document.querySelector("#active-matches-list");
 const matchHistoryList = document.querySelector("#match-history-list");
 const refreshMyMatchesButton = document.querySelector("#refresh-my-matches-button");
+const liveMatchesList = document.querySelector("#live-matches-list");
+const refreshLiveMatchesButton = document.querySelector("#refresh-live-matches-button");
 const matchModeInput = document.querySelector("#match-mode");
 const matchControls = document.querySelector("#match-controls");
 const turnTimer = document.querySelector("#turn-timer");
@@ -214,6 +216,7 @@ function showAuthenticatedUser(user) {
 
     void loadMatches();
     void loadMyMatches();
+    void loadLiveMatches();
     void ensureRealtimeConnected();
 }
 
@@ -224,6 +227,7 @@ function showAuthPage() {
 
     matchesList.replaceChildren();
     activeMatchesList.replaceChildren();
+    liveMatchesList.replaceChildren();
     matchHistoryList.replaceChildren();
 
     appPage.classList.add("hidden");
@@ -464,7 +468,7 @@ function renderMatch(match) {
         ? "X"
         : isOpponent
             ? "O"
-            : "-";
+            : "Gledalac";
 
     playerSymbol.textContent = mySymbol;
 
@@ -550,6 +554,8 @@ function renderBoard(match) {
 function updateMatchStatus(match) {
     gameMessage.className = "message";
 
+    const isParticipant = match.ownerUserId === currentUser.id || match.opponentUserId === currentUser.id;
+
     if (match.status === "WaitingForOpponent") {
         matchStatus.textContent =
             "Čeka se protivnik...";
@@ -561,8 +567,16 @@ function updateMatchStatus(match) {
     }
 
     if (match.status === "Paused") {
+
         matchStatus.textContent =
             "Meč je pauziran.";
+
+        if (!isParticipant) {
+            gameMessage.textContent =
+                "Posmatrate pauziranu partiju.";
+
+            return;
+        }
 
         if (match.ownerUserId === currentUser.id) {
             gameMessage.textContent =
@@ -592,6 +606,16 @@ function updateMatchStatus(match) {
             gameMessage.textContent =
                 `${match.winnerUserName} je pobedio.`;
         }
+
+        return;
+    }
+
+    if (!isParticipant) {
+        matchStatus.textContent =
+            "Meč je u toku.";
+
+        gameMessage.textContent =
+            "Posmatrate partiju uživo.";
 
         return;
     }
@@ -672,7 +696,8 @@ async function closeMatch() {
 
     await Promise.all([
         loadMatches(),
-        loadMyMatches()
+        loadMyMatches(),
+        loadLiveMatches()
     ]);
 }
 
@@ -721,7 +746,8 @@ function createHubConnection() {
 
             await Promise.all([
                 loadMatches(),
-                loadMyMatches()
+                loadMyMatches(),
+                loadLiveMatches()
             ]);
         });
 
@@ -855,6 +881,118 @@ async function stopRealtimeConnection() {
 
     hubConnection = null;
     hubStartPromise = null;
+}
+
+async function loadLiveMatches() {
+    try {
+        const response =
+            await fetch("/api/matches/live");
+
+        if (!response.ok) {
+            return;
+        }
+
+        const matches =
+            await response.json();
+
+        renderLiveMatches(matches);
+    } catch (error) {
+        console.error(
+            "Could not load live matches:",
+            error);
+
+        liveMatchesList.replaceChildren();
+
+        const message =
+            document.createElement("p");
+
+        message.className = "empty-state";
+        message.textContent =
+            "Nije moguće učitati mečeve uživo.";
+
+        liveMatchesList.append(message);
+    }
+}
+
+function renderLiveMatches(matches) {
+    liveMatchesList.replaceChildren();
+
+    if (matches.length === 0) {
+        const empty =
+            document.createElement("p");
+
+        empty.className = "empty-state";
+        empty.textContent =
+            "Trenutno nema mečeva uživo.";
+
+        liveMatchesList.append(empty);
+        return;
+    }
+
+    for (const match of matches) {
+        const card =
+            document.createElement("article");
+
+        card.className = "match-card";
+
+        const info =
+            document.createElement("div");
+
+        info.className = "match-info";
+
+        const title =
+            document.createElement("span");
+
+        title.className = "match-owner";
+        title.textContent =
+            `${match.ownerUserName} protiv ` +
+            `${match.opponentUserName}`;
+
+        const details =
+            document.createElement("span");
+
+        details.className = "match-details";
+
+        const modeText =
+            match.mode === "Classic"
+                ? "Classic"
+                : "Connect-K";
+
+        const statusText =
+            match.status === "Paused"
+                ? "Pauziran"
+                : "U toku";
+
+        details.textContent =
+            `${modeText} · ` +
+            `${match.boardSize}×${match.boardSize}` +
+            ` · ${match.winLength} za pobedu` +
+            ` · ${statusText}`;
+
+        info.append(
+            title,
+            details);
+
+        const button =
+            document.createElement("button");
+
+        button.type = "button";
+        button.className =
+            "secondary-button";
+        button.textContent = "Gledaj";
+
+        button.addEventListener(
+            "click",
+            async () => {
+                await openMatch(match.id);
+            });
+
+        card.append(
+            info,
+            button);
+
+        liveMatchesList.append(card);
+    }
 }
 
 async function loadMyMatches() {
@@ -1129,6 +1267,10 @@ function renderMatchHistory(matches) {
 refreshMyMatchesButton.addEventListener(
     "click",
     loadMyMatches);
+
+refreshLiveMatchesButton.addEventListener(
+    "click",
+    loadLiveMatches);
 
 function updateMatchModeFields() {
     const mode = matchModeInput.value;
