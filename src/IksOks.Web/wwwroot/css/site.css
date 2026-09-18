@@ -352,3 +352,98 @@ input {
     font-size: 20px;
     font-weight: 700;
 }
+
+.profile-leaderboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 24px;
+}
+
+.profile-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.profile-user-name {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+}
+
+.profile-member-since {
+    margin: 0;
+    color: #6b7280;
+    font-size: 14px;
+}
+
+.profile-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.profile-stat {
+    padding: 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+    .profile-stat strong {
+        display: block;
+        font-size: 20px;
+    }
+
+    .profile-stat span {
+        color: #6b7280;
+        font-size: 13px;
+    }
+
+.leaderboard-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.leaderboard-row {
+    display: grid;
+    grid-template-columns: 40px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+.leaderboard-self {
+    font-weight: 700;
+    border-width: 2px;
+}
+
+.leaderboard-rank {
+    font-weight: 700;
+    text-align: center;
+}
+
+.leaderboard-player {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.leaderboard-details {
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.leaderboard-points {
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+    .profile-leaderboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
