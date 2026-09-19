@@ -447,3 +447,70 @@ input {
         grid-template-columns: 1fr;
     }
 }
+
+.emoji-chat {
+    width: min(90vw, 520px);
+    margin: 20px auto 0;
+    padding: 14px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+}
+
+.emoji-chat-header {
+    margin-bottom: 10px;
+}
+
+.emoji-chat-messages {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 52px;
+    max-height: 160px;
+    overflow-y: auto;
+    padding: 8px;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.emoji-chat-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.emoji-chat-message-self {
+    font-weight: 700;
+}
+
+.emoji-chat-emoji {
+    font-size: 24px;
+}
+
+.emoji-chat-time {
+    margin-left: auto;
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.emoji-chat-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.emoji-chat-button {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: white;
+    padding: 7px 10px;
+    font-size: 22px;
+    cursor: pointer;
+}
+
+    .emoji-chat-button:hover {
+        background: #f3f4f6;
+    }

@@ -35,8 +35,19 @@ const refreshLiveMatchesButton = document.querySelector("#refresh-live-matches-b
 const matchModeInput = document.querySelector("#match-mode");
 const matchControls = document.querySelector("#match-controls");
 const turnTimer = document.querySelector("#turn-timer");
+const emojiChatMessages = document.querySelector("#emoji-chat-messages");
+const emojiChatActions = document.querySelector("#emoji-chat-actions");
 
-
+const availableEmojis = [
+    "😀",
+    "😂",
+    "😎",
+    "🔥",
+    "👏",
+    "🤔",
+    "😢",
+    "😡"
+];
 let mode = "login";
 let currentUser = null;
 let activeMatchId = null;
@@ -195,6 +206,8 @@ function resetMatchView() {
     turnTimer.textContent = "";
     matchControls.replaceChildren();
     gameBoard.replaceChildren();
+    emojiChatMessages.replaceChildren();
+    emojiChatActions.replaceChildren();
 
     matchTitle.textContent = "";
     matchStatus.textContent = "";
@@ -428,6 +441,10 @@ function showMatchMessage(text, type) {
 }
 
 async function openMatch(matchId) {
+
+    emojiChatMessages.replaceChildren();
+    emojiChatActions.replaceChildren();
+
     activeMatchId = matchId;
 
     lobbyView.classList.add("hidden");
@@ -499,6 +516,7 @@ function renderMatch(match) {
     updateTurnTimer(match);
 
     renderMatchControls(match);
+    renderEmojiChatControls(match);
 }
 
 function renderBoard(match) {
@@ -698,6 +716,8 @@ async function closeMatch() {
     }
 
     gameBoard.replaceChildren();
+    emojiChatMessages.replaceChildren();
+    emojiChatActions.replaceChildren();
 
     matchView.classList.add("hidden");
     lobbyView.classList.remove("hidden");
@@ -739,6 +759,32 @@ function createHubConnection() {
             }
 
             await loadActiveMatch();
+        });
+
+    hubConnection.on(
+        "EmojiReceived",
+        chatMessage => {
+            if (!activeMatchId) {
+                return;
+            }
+
+            const currentId =
+                activeMatchId.toLowerCase();
+
+            const messageMatchId =
+                String(
+                    chatMessage.matchId)
+                    .toLowerCase();
+
+            if (
+                currentId !==
+                messageMatchId
+            ) {
+                return;
+            }
+
+            appendEmojiMessage(
+                chatMessage);
         });
 
     hubConnection.on(
@@ -1559,6 +1605,124 @@ matchModeInput.addEventListener(
 
 updateMatchModeFields();
 
+function renderEmojiChatControls(match) {
+    emojiChatActions.replaceChildren();
+
+    const isParticipant =
+        match.ownerUserId === currentUser.id ||
+        match.opponentUserId === currentUser.id;
+
+    const canSend =
+        isParticipant &&
+        (
+            match.status === "InProgress" ||
+            match.status === "Paused"
+        );
+
+    if (!canSend) {
+        return;
+    }
+
+    for (const emoji of availableEmojis) {
+        const button =
+            document.createElement("button");
+
+        button.type = "button";
+        button.className =
+            "emoji-chat-button";
+
+        button.textContent = emoji;
+
+        button.addEventListener(
+            "click",
+            async () => {
+                await sendEmoji(emoji);
+            });
+
+        emojiChatActions.append(button);
+    }
+}
+
+async function sendEmoji(emoji) {
+    if (!activeMatchId) {
+        return;
+    }
+
+    const connected =
+        await ensureRealtimeConnected();
+
+    if (!connected) {
+        return;
+    }
+
+    try {
+        await hubConnection.invoke(
+            "SendEmoji",
+            activeMatchId,
+            emoji);
+    } catch (error) {
+        console.error(
+            "Could not send emoji:",
+            error);
+    }
+}
+function appendEmojiMessage(chatMessage) {
+    const row =
+        document.createElement("div");
+
+    row.className =
+        "emoji-chat-message";
+
+    if (
+        chatMessage.userId ===
+        currentUser.id
+    ) {
+        row.classList.add(
+            "emoji-chat-message-self");
+    }
+
+    const userName =
+        document.createElement("span");
+
+    userName.textContent =
+        chatMessage.userId === currentUser.id
+            ? "Vi"
+            : chatMessage.userName;
+
+    const emoji =
+        document.createElement("span");
+
+    emoji.className =
+        "emoji-chat-emoji";
+
+    emoji.textContent =
+        chatMessage.emoji;
+
+    const time =
+        document.createElement("span");
+
+    time.className =
+        "emoji-chat-time";
+
+    time.textContent =
+        new Date(chatMessage.sentAt)
+            .toLocaleTimeString(
+                "sr-RS",
+                {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                });
+
+    row.append(
+        userName,
+        emoji,
+        time);
+
+    emojiChatMessages.append(row);
+
+    emojiChatMessages.scrollTop =
+        emojiChatMessages.scrollHeight;
+}
 function renderMatchControls(match) {
     matchControls.replaceChildren();
 
