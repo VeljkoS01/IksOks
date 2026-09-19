@@ -10,5 +10,7 @@ public sealed class AppUser
 
     public string PasswordHash { get; set; } = string.Empty;
 
+    public int TokenBalance { get; set; } = 30;
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

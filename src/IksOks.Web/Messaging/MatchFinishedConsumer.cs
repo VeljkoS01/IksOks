@@ -15,6 +15,10 @@ public sealed class MatchFinishedConsumer
     private const string RoutingKey =
         "match.finished";
 
+    private const int WinnerReward = 10;
+    private const int LoserReward = 4;
+    private const int DrawReward = 6;
+
     private readonly RabbitMqOptions _options;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MatchFinishedConsumer> _logger;
@@ -138,6 +142,54 @@ public sealed class MatchFinishedConsumer
 
             if (!alreadyProcessed)
             {
+
+                var owner = await db.Users
+    .SingleOrDefaultAsync(
+        user =>
+            user.Id ==
+            message.OwnerUserId,
+        cancellationToken);
+
+                var opponent = await db.Users
+                    .SingleOrDefaultAsync(
+                        user =>
+                            user.Id ==
+                            message.OpponentUserId,
+                        cancellationToken);
+
+                if (owner is not null &&
+                    opponent is not null)
+                {
+                    if (message.IsDraw)
+                    {
+                        owner.TokenBalance +=
+                            DrawReward;
+
+                        opponent.TokenBalance +=
+                            DrawReward;
+                    }
+                    else if (
+                        message.WinnerUserId ==
+                        owner.Id)
+                    {
+                        owner.TokenBalance +=
+                            WinnerReward;
+
+                        opponent.TokenBalance +=
+                            LoserReward;
+                    }
+                    else if (
+                        message.WinnerUserId ==
+                        opponent.Id)
+                    {
+                        opponent.TokenBalance +=
+                            WinnerReward;
+
+                        owner.TokenBalance +=
+                            LoserReward;
+                    }
+                }
+
                 db.MatchFinishedEvents.Add(
                     new MatchFinishedEventRecord
                     {
