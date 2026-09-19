@@ -1,4 +1,5 @@
 ﻿using System.Security.Claims;
+using IksOks.Web.Contracts.Matches;
 using IksOks.Web.Domain.Enums;
 using IksOks.Web.Infrastructure.Persistence;
 using Microsoft.AspNetCore.SignalR;
@@ -8,6 +9,18 @@ namespace IksOks.Web.Realtime;
 
 public sealed class MatchHub : Hub
 {
+    private static readonly HashSet<string> AllowedEmojis =
+    new(StringComparer.Ordinal)
+    {
+        "😀",
+        "😂",
+        "😎",
+        "🔥",
+        "👏",
+        "🤔",
+        "😢",
+        "😡"
+    };
     private readonly IksOksDbContext _db;
 
     public MatchHub(IksOksDbContext db)
@@ -63,6 +76,82 @@ public sealed class MatchHub : Hub
             Context.ConnectionId,
             GroupName(matchId),
             Context.ConnectionAborted);
+    }
+
+    public async Task SendEmoji(
+    Guid matchId,
+    string emoji)
+    {
+        var userIdValue = Context.User?
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            throw new HubException(
+                "Authenticated user was not found.");
+        }
+
+        if (!AllowedEmojis.Contains(emoji))
+        {
+            throw new HubException(
+                "Emoji is not allowed.");
+        }
+
+        var match = await _db.Matches
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                match => match.Id == matchId,
+                Context.ConnectionAborted);
+
+        if (match is null)
+        {
+            throw new HubException(
+                "Match was not found.");
+        }
+
+        var isParticipant =
+            match.OwnerUserId == userId ||
+            match.OpponentUserId == userId;
+
+        if (!isParticipant)
+        {
+            throw new HubException(
+                "Only match participants can send emojis.");
+        }
+
+        var canChat =
+            match.Status == MatchStatus.InProgress ||
+            match.Status == MatchStatus.Paused;
+
+        if (!canChat)
+        {
+            throw new HubException(
+                "Emoji chat is not available in the current match state.");
+        }
+
+        var userName =
+            Context.User?
+                .FindFirst(ClaimTypes.Name)?
+                .Value
+            ?? "Igrač";
+
+        var message =
+            new EmojiChatMessage(
+                match.Id,
+                userId,
+                userName,
+                emoji,
+                DateTimeOffset.UtcNow);
+
+        await Clients
+            .Group(GroupName(match.Id))
+            .SendAsync(
+                "EmojiReceived",
+                message,
+                Context.ConnectionAborted);
     }
 
     public async Task LeaveMatch(Guid matchId)
