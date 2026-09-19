@@ -514,3 +514,45 @@ input {
     .emoji-chat-button:hover {
         background: #f3f4f6;
     }
+
+.store-card {
+    margin-top: 24px;
+}
+
+.token-balance {
+    margin: 4px 0 0;
+    font-weight: 700;
+}
+
+.store-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.store-item {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+}
+
+.store-item-preview {
+    font-size: 30px;
+}
+
+.store-item-name {
+    font-weight: 700;
+}
+
+.store-item-details {
+    color: #6b7280;
+    font-size: 13px;
+}
+
+.store-item-owned {
+    opacity: 0.7;
+}
