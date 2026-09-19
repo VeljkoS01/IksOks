@@ -153,9 +153,12 @@ app.MapGet("/api/health", () =>
 
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapAuthEndpoints();
 app.MapMatchEndpoints();
 app.MapUserEndpoints();
+app.MapStoreEndpoints();
+
 app.MapHub<MatchHub>("/hubs/match")
     .RequireAuthorization();
 

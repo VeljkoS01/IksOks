@@ -95,6 +95,7 @@ public static class UserEndpoints
                 user.Id,
                 user.UserName,
                 user.CreatedAt,
+                user.TokenBalance,
                 matchesPlayed,
                 wins,
                 draws,

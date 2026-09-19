@@ -4,12 +4,13 @@ using IksOks.Web.Domain.Enums;
 using IksOks.Web.Infrastructure.Persistence;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using IksOks.Web.Domain.Store;
 
 namespace IksOks.Web.Realtime;
 
 public sealed class MatchHub : Hub
 {
-    private static readonly HashSet<string> AllowedEmojis =
+    private static readonly HashSet<string> BasicEmojis =
     new(StringComparer.Ordinal)
     {
         "😀",
@@ -94,10 +95,32 @@ public sealed class MatchHub : Hub
                 "Authenticated user was not found.");
         }
 
-        if (!AllowedEmojis.Contains(emoji))
+        if (!BasicEmojis.Contains(emoji))
         {
-            throw new HubException(
-                "Emoji is not allowed.");
+            var premiumEmoji =
+                StoreCatalog.FindEmoji(emoji);
+
+            if (premiumEmoji is null)
+            {
+                throw new HubException(
+                    "Emoji is not allowed.");
+            }
+
+            var ownsEmoji =
+                await _db.UserPurchases
+                    .AsNoTracking()
+                    .AnyAsync(
+                        purchase =>
+                            purchase.UserId == userId &&
+                            purchase.ItemKey ==
+                            premiumEmoji.Key,
+                        Context.ConnectionAborted);
+
+            if (!ownsEmoji)
+            {
+                throw new HubException(
+                    "You do not own this emoji.");
+            }
         }
 
         var match = await _db.Matches

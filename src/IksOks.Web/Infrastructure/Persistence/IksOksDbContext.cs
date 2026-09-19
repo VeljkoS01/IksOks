@@ -12,6 +12,7 @@ public sealed class IksOksDbContext : DbContext
     }
 
     public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<UserPurchase> UserPurchases => Set<UserPurchase>();
     public DbSet<GameMatch> Matches => Set<GameMatch>();
     public DbSet<MatchMove> MatchMoves => Set<MatchMove>();
     public DbSet<MatchFinishedEventRecord> MatchFinishedEvents => Set<MatchFinishedEventRecord>();
@@ -40,8 +41,37 @@ public sealed class IksOksDbContext : DbContext
             .HasMaxLength(512)
             .IsRequired();
 
+        user.Property(x => x.TokenBalance)
+            .HasDefaultValue(30)
+            .IsRequired();
+
         user.Property(x => x.CreatedAt)
             .IsRequired();
+
+        var purchase = modelBuilder.Entity<UserPurchase>();
+
+        purchase.ToTable("UserPurchases");
+
+        purchase.HasKey(x => x.Id);
+
+        purchase.Property(x => x.ItemKey)
+            .HasMaxLength(64)
+            .IsRequired();
+
+        purchase.Property(x => x.PurchasedAt)
+            .IsRequired();
+
+        purchase.HasOne(x => x.User)
+            .WithMany()
+            .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        purchase.HasIndex(x => new
+        {
+            x.UserId,
+            x.ItemKey
+        })
+        .IsUnique();
 
 
         var match = modelBuilder.Entity<GameMatch>();
