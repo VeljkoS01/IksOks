@@ -6,6 +6,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using IksOks.Web.Realtime;
+using Microsoft.AspNetCore.SignalR;
 
 namespace IksOks.Web.Messaging;
 
@@ -22,6 +24,7 @@ public sealed class MatchFinishedConsumer
     private readonly RabbitMqOptions _options;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<MatchFinishedConsumer> _logger;
+    private readonly IHubContext<MatchHub> _hub;
 
     private IConnection? _connection;
     private IModel? _channel;
@@ -29,11 +32,13 @@ public sealed class MatchFinishedConsumer
     public MatchFinishedConsumer(
         IOptions<RabbitMqOptions> options,
         IServiceScopeFactory scopeFactory,
-        ILogger<MatchFinishedConsumer> logger)
+        ILogger<MatchFinishedConsumer> logger,
+        IHubContext<MatchHub> hub)
     {
         _options = options.Value;
         _scopeFactory = scopeFactory;
         _logger = logger;
+        _hub = hub;
     }
 
     protected override Task ExecuteAsync(
@@ -144,11 +149,11 @@ public sealed class MatchFinishedConsumer
             {
 
                 var owner = await db.Users
-    .SingleOrDefaultAsync(
-        user =>
-            user.Id ==
-            message.OwnerUserId,
-        cancellationToken);
+                    .SingleOrDefaultAsync(
+                        user =>
+                            user.Id ==
+                            message.OwnerUserId,
+                        cancellationToken);
 
                 var opponent = await db.Users
                     .SingleOrDefaultAsync(
@@ -211,6 +216,18 @@ public sealed class MatchFinishedConsumer
 
                 await db.SaveChangesAsync(
                     cancellationToken);
+
+                await _hub.Clients
+                    .User(message.OwnerUserId.ToString())
+                    .SendAsync(
+                        "BalanceUpdated",
+                        cancellationToken);
+
+                await _hub.Clients
+                    .User(message.OpponentUserId.ToString())
+                    .SendAsync(
+                        "BalanceUpdated",
+                        cancellationToken);
             }
 
             _channel.BasicAck(

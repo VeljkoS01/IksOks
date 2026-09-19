@@ -19,6 +19,9 @@ const profileSummary = document.querySelector("#profile-summary");
 const refreshProfileButton = document.querySelector("#refresh-profile-button");
 const leaderboardList = document.querySelector("#leaderboard-list");
 const refreshLeaderboardButton = document.querySelector("#refresh-leaderboard-button");
+const tokenBalance = document.querySelector("#token-balance");
+const storeList = document.querySelector("#store-list");
+const refreshStoreButton = document.querySelector("#refresh-store-button");
 const lobbyView = document.querySelector("#lobby-view");
 const matchView = document.querySelector("#match-view");
 const matchTitle = document.querySelector("#match-title");
@@ -38,7 +41,7 @@ const turnTimer = document.querySelector("#turn-timer");
 const emojiChatMessages = document.querySelector("#emoji-chat-messages");
 const emojiChatActions = document.querySelector("#emoji-chat-actions");
 
-const availableEmojis = [
+const basicEmojis = [
     "😀",
     "😂",
     "😎",
@@ -48,6 +51,10 @@ const availableEmojis = [
     "😢",
     "😡"
 ];
+
+let availableEmojis =
+    [...basicEmojis];
+
 let mode = "login";
 let currentUser = null;
 let activeMatchId = null;
@@ -235,6 +242,7 @@ function showAuthenticatedUser(user) {
     void loadMyMatches();
     void loadLiveMatches();
     void loadProfile();
+    void loadStore();
     void loadLeaderboard();
     void ensureRealtimeConnected();
 }
@@ -250,6 +258,12 @@ function showAuthPage() {
     matchHistoryList.replaceChildren();
     profileSummary.replaceChildren();
     leaderboardList.replaceChildren();
+    storeList.replaceChildren();
+    tokenBalance.textContent =
+        "Tokeni: -";
+
+    availableEmojis =
+        [...basicEmojis];
 
     appPage.classList.add("hidden");
     authPage.classList.remove("hidden");
@@ -788,6 +802,19 @@ function createHubConnection() {
         });
 
     hubConnection.on(
+        "BalanceUpdated",
+        async () => {
+            if (!currentUser) {
+                return;
+            }
+
+            await Promise.all([
+                loadProfile(),
+                loadStore()
+            ]);
+        });
+
+    hubConnection.on(
         "LobbyUpdated",
         async () => {
             if (!currentUser) {
@@ -947,6 +974,164 @@ async function stopRealtimeConnection() {
     hubStartPromise = null;
 }
 
+async function loadStore() {
+    try {
+        const response =
+            await fetch("/api/store");
+
+        if (!response.ok) {
+            return;
+        }
+
+        const store =
+            await response.json();
+
+        renderStore(store);
+
+        const ownedPremiumEmojis =
+            store.items
+                .filter(item =>
+                    item.type === "Emoji" &&
+                    item.isOwned)
+                .map(item =>
+                    item.value);
+
+        availableEmojis = [
+            ...basicEmojis,
+            ...ownedPremiumEmojis
+        ];
+    } catch (error) {
+        console.error(
+            "Could not load store:",
+            error);
+
+        storeList.replaceChildren();
+
+        const message =
+            document.createElement("p");
+
+        message.className =
+            "empty-state";
+
+        message.textContent =
+            "Nije moguće učitati prodavnicu.";
+
+        storeList.append(message);
+    }
+}
+
+function renderStore(store) {
+    tokenBalance.textContent =
+        `Tokeni: ${store.tokenBalance}`;
+
+    storeList.replaceChildren();
+
+    for (const item of store.items) {
+        const card =
+            document.createElement("article");
+
+        card.className = "store-item";
+
+        if (item.isOwned) {
+            card.classList.add(
+                "store-item-owned");
+        }
+
+        const preview =
+            document.createElement("div");
+
+        preview.className =
+            "store-item-preview";
+
+        preview.textContent =
+            item.type === "Emoji"
+                ? item.value
+                : "▣";
+
+        const name =
+            document.createElement("div");
+
+        name.className =
+            "store-item-name";
+
+        name.textContent =
+            item.name;
+
+        const details =
+            document.createElement("div");
+
+        details.className =
+            "store-item-details";
+
+        details.textContent =
+            `${item.type} · ${item.price} tokena`;
+
+        const button =
+            document.createElement("button");
+
+        button.type = "button";
+        button.className =
+            "secondary-button";
+
+        if (item.isOwned) {
+            button.textContent =
+                "Kupljeno";
+
+            button.disabled = true;
+        } else {
+            button.textContent =
+                "Kupi";
+
+            button.addEventListener(
+                "click",
+                async () => {
+                    await purchaseStoreItem(
+                        item.key);
+                });
+        }
+
+        card.append(
+            preview,
+            name,
+            details,
+            button);
+
+        storeList.append(card);
+    }
+}
+
+async function purchaseStoreItem(
+    itemKey) {
+    try {
+        const response =
+            await fetch(
+                `/api/store/${itemKey}/purchase`,
+                {
+                    method: "POST"
+                });
+
+        if (!response.ok) {
+            const error =
+                await readError(response);
+
+            showMatchMessage(
+                error,
+                "error");
+
+            return;
+        }
+
+        await Promise.all([
+            loadStore(),
+            loadProfile()
+        ]);
+    } catch (error) {
+        console.error(
+            "Could not purchase store item:",
+            error);
+    }
+}
+
 async function loadProfile() {
     try {
         const response =
@@ -1008,6 +1193,7 @@ function renderProfile(profile) {
         "profile-stats-grid";
 
     const values = [
+        ["Tokeni", profile.tokenBalance],
         ["Odigrano", profile.matchesPlayed],
         ["Pobede", profile.wins],
         ["Nerešeno", profile.draws],
@@ -1558,6 +1744,10 @@ refreshProfileButton.addEventListener(
 refreshLeaderboardButton.addEventListener(
     "click",
     loadLeaderboard);
+
+refreshStoreButton.addEventListener(
+    "click",
+    loadStore);
 
 function updateMatchModeFields() {
     const mode = matchModeInput.value;
