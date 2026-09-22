@@ -36,10 +36,18 @@ const refreshMyMatchesButton = document.querySelector("#refresh-my-matches-butto
 const liveMatchesList = document.querySelector("#live-matches-list");
 const refreshLiveMatchesButton = document.querySelector("#refresh-live-matches-button");
 const matchModeInput = document.querySelector("#match-mode");
+const matchVisibilityInput = document.querySelector("#match-visibility");
+const privateMatchCodeInput = document.querySelector("#private-match-code");
+const joinPrivateMatchButton = document.querySelector("#join-private-match-button");
+const privateMatchMessage = document.querySelector("#private-match-message");
+const matchJoinCode = document.querySelector("#match-join-code");
+const profileCard = document.querySelector("#profile-card");
+const playerBadge = document.querySelector("#player-badge");
 const matchControls = document.querySelector("#match-controls");
 const turnTimer = document.querySelector("#turn-timer");
 const emojiChatMessages = document.querySelector("#emoji-chat-messages");
 const emojiChatActions = document.querySelector("#emoji-chat-actions");
+const clearBorderButton = document.querySelector("#clear-border-button");
 
 const basicEmojis = [
     "😀",
@@ -305,6 +313,7 @@ createMatchForm.addEventListener(
         event.preventDefault();
 
         const mode = matchModeInput.value;
+        const visibility = matchVisibilityInput.value;
         const boardSize = Number(boardSizeInput.value);
         const winLength = Number(winLengthInput.value);
 
@@ -315,6 +324,7 @@ createMatchForm.addEventListener(
             },
             body: JSON.stringify({
                 mode,
+                visibility,
                 boardSize,
                 winLength
             })
@@ -339,6 +349,10 @@ createMatchForm.addEventListener(
 refreshMatchesButton.addEventListener(
     "click",
     loadMatches);
+
+joinPrivateMatchButton.addEventListener(
+    "click",
+    joinPrivateMatch);
 
 async function loadMatches() {
     try {
@@ -449,6 +463,56 @@ async function joinMatch(matchId) {
     }
 }
 
+async function joinPrivateMatch() {
+    const joinCode =
+        privateMatchCodeInput.value
+            .trim()
+            .toUpperCase();
+
+    if (!joinCode) {
+        privateMatchMessage.textContent =
+            "Unesite kod privatnog meča.";
+
+        return;
+    }
+
+    try {
+        const response = await fetch(
+            "/api/matches/join-private",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+                body: JSON.stringify({
+                    joinCode
+                })
+            });
+
+        if (!response.ok) {
+            const error =
+                await readError(response);
+
+            privateMatchMessage.textContent =
+                error;
+
+            return;
+        }
+
+        const match =
+            await response.json();
+
+        privateMatchCodeInput.value = "";
+        privateMatchMessage.textContent = "";
+
+        await openMatch(match.id);
+    } catch {
+        privateMatchMessage.textContent =
+            "Nije moguće pridružiti se privatnom meču.";
+    }
+}
+
 function showMatchMessage(text, type) {
     matchMessage.textContent = text;
     matchMessage.className = `message ${type}`;
@@ -469,7 +533,6 @@ async function openMatch(matchId) {
     await joinMatchGroup(matchId);
     await loadActiveMatch();
 }
-
 
 async function loadActiveMatch() {
     if (!activeMatchId) {
@@ -523,6 +586,22 @@ function renderMatch(match) {
     matchTitle.textContent = opponentName
         ? `${modeText} protiv ${opponentName}`
         : `${modeText} · čekanje protivnika`;
+
+    if (
+        match.visibility === "Private" &&
+        match.joinCode
+    ) {
+        matchJoinCode.textContent =
+            `Kod privatnog meča: ${match.joinCode}`;
+
+        matchJoinCode.classList.remove(
+            "hidden");
+    } else {
+        matchJoinCode.textContent = "";
+
+        matchJoinCode.classList.add(
+            "hidden");
+    }
 
     renderBoard(match);
 
@@ -938,6 +1017,7 @@ async function joinMatchGroup(matchId) {
             error);
     }
 }
+
 async function leaveMatchGroup(matchId) {
     if (
         !hubConnection ||
@@ -957,6 +1037,7 @@ async function leaveMatchGroup(matchId) {
             error);
     }
 }
+
 async function stopRealtimeConnection() {
     if (hubConnection === null) {
         return;
@@ -987,6 +1068,8 @@ async function loadStore() {
             await response.json();
 
         renderStore(store);
+
+        applyActiveBorder(store.activeBorderKey);
 
         const ownedPremiumEmojis =
             store.items
@@ -1043,10 +1126,16 @@ function renderStore(store) {
         preview.className =
             "store-item-preview";
 
-        preview.textContent =
-            item.type === "Emoji"
-                ? item.value
-                : "▣";
+        if (item.type === "Emoji") {
+            preview.textContent =
+                item.value;
+        } else {
+            preview.textContent = "XO";
+
+            preview.classList.add(
+                "border-preview",
+                item.value);
+        }
 
         const name =
             document.createElement("div");
@@ -1073,14 +1162,8 @@ function renderStore(store) {
         button.className =
             "secondary-button";
 
-        if (item.isOwned) {
-            button.textContent =
-                "Kupljeno";
-
-            button.disabled = true;
-        } else {
-            button.textContent =
-                "Kupi";
+        if (!item.isOwned) {
+            button.textContent = "Kupi";
 
             button.addEventListener(
                 "click",
@@ -1088,6 +1171,26 @@ function renderStore(store) {
                     await purchaseStoreItem(
                         item.key);
                 });
+        } else if (
+            item.type === "Border" &&
+            item.isActive
+        ) {
+            button.textContent = "Aktivan";
+            button.disabled = true;
+        } else if (
+            item.type === "Border"
+        ) {
+            button.textContent = "Aktiviraj";
+
+            button.addEventListener(
+                "click",
+                async () => {
+                    await activateBorder(
+                        item.key);
+                });
+        } else {
+            button.textContent = "Kupljeno";
+            button.disabled = true;
         }
 
         card.append(
@@ -1130,6 +1233,54 @@ async function purchaseStoreItem(
             "Could not purchase store item:",
             error);
     }
+}
+
+async function activateBorder(
+    itemKey) {
+    const response = await fetch(
+        `/api/store/${itemKey}/activate`,
+        {
+            method: "POST"
+        });
+
+    if (!response.ok) {
+        const error =
+            await readError(response);
+
+        showMatchMessage(
+            error,
+            "error");
+
+        return;
+    }
+
+    await loadStore();
+}
+
+function applyActiveBorder(
+    activeBorderKey) {
+    const borderClasses = [
+        "border-gold",
+        "border-neon"
+    ];
+
+    for (const className of borderClasses) {
+        profileCard.classList.remove(
+            className);
+
+        playerBadge.classList.remove(
+            className);
+    }
+
+    if (!activeBorderKey) {
+        return;
+    }
+
+    profileCard.classList.add(
+        activeBorderKey);
+
+    playerBadge.classList.add(
+        activeBorderKey);
 }
 
 async function loadProfile() {
@@ -1586,11 +1737,17 @@ function renderActiveMatches(matches) {
                 ? "Classic"
                 : "Connect-K";
 
+        const visibilityText =
+            match.visibility === "Private"
+                ? "Privatan"
+                : "Javan";
+
         details.textContent =
             `${modeText} · ` +
             `${match.boardSize}×${match.boardSize}` +
             ` · ${match.winLength} za pobedu` +
-            ` · ${statusText}`;
+            ` · ${statusText}` +
+            ` · ${visibilityText}`;
 
         info.append(title, details);
 
@@ -1687,10 +1844,16 @@ function renderMatchHistory(matches) {
                 ? "Classic"
                 : "Connect-K";
 
+        const visibilityText =
+            match.visibility === "Private"
+                ? "Privatan"
+                : "Javan";
+
         details.textContent =
             `${modeText} · ` +
             `${match.boardSize}×${match.boardSize}` +
-            ` · ${match.winLength} za pobedu`;
+            ` · ${match.winLength} za pobedu` +
+            ` · ${visibilityText}`;
 
         const date =
             document.createElement("span");
@@ -1793,6 +1956,20 @@ matchModeInput.addEventListener(
     "change",
     updateMatchModeFields);
 
+clearBorderButton.addEventListener(
+    "click",
+    async () => {
+        const response = await fetch(
+            "/api/store/active-border",
+            {
+                method: "DELETE"
+            });
+
+        if (response.ok) {
+            await loadStore();
+        }
+    });
+
 updateMatchModeFields();
 
 function renderEmojiChatControls(match) {
@@ -1856,6 +2033,7 @@ async function sendEmoji(emoji) {
             error);
     }
 }
+
 function appendEmojiMessage(chatMessage) {
     const row =
         document.createElement("div");
@@ -1913,6 +2091,7 @@ function appendEmojiMessage(chatMessage) {
     emojiChatMessages.scrollTop =
         emojiChatMessages.scrollHeight;
 }
+
 function renderMatchControls(match) {
     matchControls.replaceChildren();
 

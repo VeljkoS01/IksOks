@@ -556,3 +556,45 @@ input {
 .store-item-owned {
     opacity: 0.7;
 }
+
+.private-match-join {
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid #e5e7eb;
+}
+
+.private-match-join-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+    .private-match-join-row input {
+        flex: 1;
+        min-width: 0;
+    }
+
+.match-join-code {
+    margin: 6px 0 0;
+    font-weight: 700;
+}
+
+.border-gold {
+    border: 3px solid #d4af37 !important;
+    box-shadow: 0 0 12px rgba(212, 175, 55, 0.45);
+}
+
+.border-neon {
+    border: 3px solid #00d9ff !important;
+    box-shadow: 0 0 14px rgba(0, 217, 255, 0.6);
+}
+
+.border-preview {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 70px;
+    height: 55px;
+    border-radius: 8px;
+    font-weight: 700;
+}
