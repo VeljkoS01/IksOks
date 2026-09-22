@@ -7,6 +7,7 @@ public sealed record UserMatchResponse(
     Guid? OpponentUserId,
     string? OpponentUserName,
     string Mode,
+    string Visibility,
     int BoardSize,
     int WinLength,
     string Status,

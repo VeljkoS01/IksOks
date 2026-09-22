@@ -2,4 +2,5 @@
 
 public sealed record StoreResponse(
     int TokenBalance,
+    string? ActiveBorderKey,
     IReadOnlyList<StoreItemResponse> Items);

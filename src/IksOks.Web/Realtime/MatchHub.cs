@@ -63,9 +63,16 @@ public sealed class MatchHub : Hub
             match.OpponentUserId == userId;
 
         var canSpectate =
-            match.Status == MatchStatus.InProgress ||
-            match.Status == MatchStatus.Paused ||
-            match.Status == MatchStatus.Finished;
+            match.Visibility ==
+                MatchVisibility.Public &&
+            (
+                match.Status ==
+                    MatchStatus.InProgress ||
+                match.Status ==
+                    MatchStatus.Paused ||
+                match.Status ==
+                    MatchStatus.Finished
+            );
 
         if (!isParticipant && !canSpectate)
         {

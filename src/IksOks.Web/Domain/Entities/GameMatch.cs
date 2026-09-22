@@ -35,6 +35,11 @@ public sealed class GameMatch
     public MatchMode Mode { get; set; }
     = MatchMode.Classic;
 
+    public MatchVisibility Visibility { get; set; }
+    = MatchVisibility.Public;
+
+    public string? JoinCode { get; set; }
+
     public Guid? PauseRequestedByUserId { get; set; }
 
     public AppUser? PauseRequestedByUser { get; set; }

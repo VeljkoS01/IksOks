@@ -24,6 +24,14 @@ public static class StoreEndpoints
             "/{itemKey}/purchase",
             PurchaseItemAsync);
 
+        group.MapPost(
+            "/{itemKey}/activate",
+            ActivateBorderAsync);
+
+        group.MapDelete(
+            "/active-border",
+            ClearActiveBorderAsync);
+
         return endpoints;
     }
 
@@ -43,13 +51,19 @@ public static class StoreEndpoints
             return Results.Unauthorized();
         }
 
-        var tokenBalance = await db.Users
+        var user = await db.Users
             .AsNoTracking()
-            .Where(user => user.Id == userId)
-            .Select(user => (int?)user.TokenBalance)
-            .SingleOrDefaultAsync(cancellationToken);
+            .Where(user =>
+                user.Id == userId)
+            .Select(user => new
+            {
+                user.TokenBalance,
+                user.ActiveBorderKey
+            })
+            .SingleOrDefaultAsync(
+                cancellationToken);
 
-        if (tokenBalance is null)
+        if (user is null)
         {
             return Results.Unauthorized();
         }
@@ -75,12 +89,18 @@ public static class StoreEndpoints
                         item.Type,
                         item.Value,
                         item.Price,
-                        ownedSet.Contains(item.Key)))
+                        ownedSet.Contains(item.Key),
+                        item.Type == StoreCatalog.BorderType &&
+                        string.Equals(
+                        item.Key,
+                        user.ActiveBorderKey,
+                        StringComparison.OrdinalIgnoreCase)))
                 .ToList();
 
         return Results.Ok(
             new StoreResponse(
-                tokenBalance.Value,
+                user.TokenBalance,
+                user.ActiveBorderKey,
                 items));
     }
 
@@ -192,5 +212,100 @@ public static class StoreEndpoints
             new PurchaseStoreItemResponse(
                 item.Key,
                 tokenBalance));
+    }
+
+    private static async Task<IResult> ActivateBorderAsync(
+    string itemKey,
+    ClaimsPrincipal principal,
+    IksOksDbContext db,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var item =
+            StoreCatalog.FindByKey(itemKey);
+
+        if (item is null ||
+            item.Type != StoreCatalog.BorderType)
+        {
+            return Results.BadRequest(new
+            {
+                error = "This item is not a border."
+            });
+        }
+
+        var ownsBorder =
+            await db.UserPurchases
+                .AsNoTracking()
+                .AnyAsync(
+                    purchase =>
+                        purchase.UserId == userId &&
+                        purchase.ItemKey == item.Key,
+                    cancellationToken);
+
+        if (!ownsBorder)
+        {
+            return Results.Forbid();
+        }
+
+        var user = await db.Users
+            .SingleOrDefaultAsync(
+                user => user.Id == userId,
+                cancellationToken);
+
+        if (user is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        user.ActiveBorderKey = item.Key;
+
+        await db.SaveChangesAsync(
+            cancellationToken);
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> ClearActiveBorderAsync(
+    ClaimsPrincipal principal,
+    IksOksDbContext db,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var user = await db.Users
+            .SingleOrDefaultAsync(
+                user => user.Id == userId,
+                cancellationToken);
+
+        if (user is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        user.ActiveBorderKey = null;
+
+        await db.SaveChangesAsync(
+            cancellationToken);
+
+        return Results.NoContent();
     }
 }

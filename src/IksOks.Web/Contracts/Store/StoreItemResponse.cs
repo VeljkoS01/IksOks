@@ -6,4 +6,5 @@ public sealed record StoreItemResponse(
     string Type,
     string Value,
     int Price,
-    bool IsOwned);
+    bool IsOwned,
+    bool IsActive);
