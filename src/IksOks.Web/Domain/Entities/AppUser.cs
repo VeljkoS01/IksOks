@@ -12,5 +12,7 @@ public sealed class AppUser
 
     public int TokenBalance { get; set; } = 30;
 
+    public string? ActiveBorderKey { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

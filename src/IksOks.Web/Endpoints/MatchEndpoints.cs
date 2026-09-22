@@ -25,6 +25,7 @@ public static class MatchEndpoints
         group.MapPost("/", CreateMatchAsync);
         group.MapGet("/", GetMatchesAsync);
         group.MapPost("/{matchId:guid}/join", JoinMatchAsync);
+        group.MapPost("/join-private",JoinPrivateMatchAsync);
         group.MapGet("/{matchId:guid}", GetMatchAsync);
         group.MapPost("/{matchId:guid}/moves",MakeMoveAsync);
         group.MapGet("/mine/active",GetMyActiveMatchesAsync);
@@ -38,6 +39,14 @@ public static class MatchEndpoints
         group.MapPost("/{matchId:guid}/resume-request/reject", RejectResumeRequestAsync);
 
         return endpoints;
+    }
+
+    private static string GenerateJoinCode()
+    {
+        return Guid.NewGuid()
+            .ToString("N")
+            [..8]
+            .ToUpperInvariant();
     }
 
     private static async Task<IResult> CreateMatchAsync(
@@ -57,6 +66,17 @@ public static class MatchEndpoints
             return Results.BadRequest(new
             {
                 error = "Unknown match mode."
+            });
+        }
+
+        if (!Enum.TryParse<MatchVisibility>(
+            request.Visibility,
+            ignoreCase: true,
+            out var visibility))
+        {
+            return Results.BadRequest(new
+            {
+                error = "Unknown match visibility."
             });
         }
 
@@ -96,6 +116,11 @@ public static class MatchEndpoints
         {
             OwnerUserId = owner.Id,
             Mode = mode,
+            Visibility = visibility,
+            JoinCode =
+        visibility == MatchVisibility.Private
+            ? GenerateJoinCode()
+            : null,
             BoardSize = request.BoardSize,
             WinLength = request.WinLength,
             Status = MatchStatus.WaitingForOpponent
@@ -118,9 +143,11 @@ public static class MatchEndpoints
     {
         var matches = await db.Matches
             .AsNoTracking()
-            .Where(match =>
-                match.Status == MatchStatus.WaitingForOpponent)
-            .OrderByDescending(match => match.CreatedAt)
+            .Where(match =>match.Status ==
+            MatchStatus.WaitingForOpponent &&
+                match.Visibility ==
+                MatchVisibility.Public)
+                .OrderByDescending(match => match.CreatedAt)
             .Select(match => new MatchResponse(
                 match.Id,
                 match.OwnerUserId,
@@ -130,6 +157,8 @@ public static class MatchEndpoints
                     ? null
                     : match.OpponentUser.UserName,
                 match.Mode.ToString(),
+                match.Visibility.ToString(),
+                match.JoinCode,
                 match.BoardSize,
                 match.WinLength,
                 match.Status.ToString(),
@@ -151,6 +180,8 @@ public static class MatchEndpoints
             match.OpponentUserId,
             null,
             match.Mode.ToString(),
+            match.Visibility.ToString(),
+            match.JoinCode,
             match.BoardSize,
             match.WinLength,
             match.Status.ToString(),
@@ -196,11 +227,12 @@ public static class MatchEndpoints
             });
         }
 
-        if (match is null)
+        if (match.Visibility != MatchVisibility.Public)
         {
-            return Results.NotFound(new
+            return Results.BadRequest(new
             {
-                error = "Match was not found."
+                error =
+                    "Private matches must be joined using the join code."
             });
         }
 
@@ -223,7 +255,7 @@ public static class MatchEndpoints
 
         var nextStatus = state.OnOpponentJoined();
 
-        var firstTurnDeadline = DateTimeOffset.UtcNow.AddSeconds(30);
+        var firstTurnDeadline = DateTimeOffset.UtcNow.AddSeconds(match.TurnDurationSeconds);
 
         var updatedRows = await db.Matches
             .Where(match =>
@@ -263,6 +295,8 @@ public static class MatchEndpoints
                     ? null
                     : match.OpponentUser.UserName,
                 match.Mode.ToString(),
+                match.Visibility.ToString(),
+                match.JoinCode,
                 match.BoardSize,
                 match.WinLength,
                 match.Status.ToString(),
@@ -281,8 +315,152 @@ public static class MatchEndpoints
         return Results.Ok(response);
     }
 
+    private static async Task<IResult> JoinPrivateMatchAsync(
+    JoinPrivateMatchRequest request,
+    ClaimsPrincipal principal,
+    IksOksDbContext db,
+    MatchStateFactory stateFactory,
+    IHubContext<MatchHub> hub,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var joinCode =
+            request.JoinCode
+                .Trim()
+                .ToUpperInvariant();
+
+        if (string.IsNullOrWhiteSpace(joinCode))
+        {
+            return Results.BadRequest(new
+            {
+                error = "Join code is required."
+            });
+        }
+
+        var match = await db.Matches
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                match =>
+                    match.Visibility ==
+                        MatchVisibility.Private &&
+                    match.JoinCode == joinCode,
+                cancellationToken);
+
+        if (match is null)
+        {
+            return Results.NotFound(new
+            {
+                error =
+                    "Private match was not found."
+            });
+        }
+
+        if (match.OwnerUserId == userId)
+        {
+            return Results.BadRequest(new
+            {
+                error =
+                    "You cannot join your own match."
+            });
+        }
+
+        var state =
+            stateFactory.GetState(match.Status);
+
+        if (!state.CanJoin(match))
+        {
+            return Results.Conflict(new
+            {
+                error =
+                    "Match is no longer available."
+            });
+        }
+
+        var nextStatus =
+            state.OnOpponentJoined();
+
+        var firstTurnDeadline =
+            DateTimeOffset.UtcNow.AddSeconds(
+                match.TurnDurationSeconds);
+
+        var updatedRows = await db.Matches
+            .Where(current =>
+                current.Id == match.Id &&
+                current.Status == state.Status &&
+                current.OpponentUserId == null)
+            .ExecuteUpdateAsync(
+                setters => setters
+                    .SetProperty(
+                        current =>
+                            current.OpponentUserId,
+                        userId)
+                    .SetProperty(
+                        current => current.Status,
+                        nextStatus)
+                    .SetProperty(
+                        current =>
+                            current.TurnDeadlineAt,
+                        firstTurnDeadline),
+                cancellationToken);
+
+        if (updatedRows == 0)
+        {
+            return Results.Conflict(new
+            {
+                error =
+                    "Match is no longer available."
+            });
+        }
+
+        var response = await db.Matches
+            .AsNoTracking()
+            .Where(current =>
+                current.Id == match.Id)
+            .Select(current =>
+                new MatchResponse(
+                    current.Id,
+                    current.OwnerUserId,
+                    current.OwnerUser.UserName,
+                    current.OpponentUserId,
+                    current.OpponentUser == null
+                        ? null
+                        : current.OpponentUser.UserName,
+                    current.Mode.ToString(),
+                    current.Visibility.ToString(),
+                    current.JoinCode,
+                    current.BoardSize,
+                    current.WinLength,
+                    current.Status.ToString(),
+                    current.CreatedAt))
+            .SingleAsync(cancellationToken);
+
+        await hub.Clients
+            .Group(MatchHub.GroupName(match.Id))
+            .SendAsync(
+                "MatchUpdated",
+                match.Id,
+                cancellationToken);
+
+        await hub.Clients.All.SendAsync(
+            "LobbyUpdated",
+            cancellationToken);
+
+        return Results.Ok(response);
+    }
+
     private static async Task<IResult> GetMatchAsync(
     Guid matchId,
+    ClaimsPrincipal principal,
     IksOksDbContext db,
     CancellationToken cancellationToken)
     {
@@ -304,6 +482,38 @@ public static class MatchEndpoints
             {
                 error = "Match was not found."
             });
+        }
+
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var isParticipant =
+            match.OwnerUserId == userId ||
+            match.OpponentUserId == userId;
+
+        var canSpectate =
+            match.Visibility ==
+                MatchVisibility.Public &&
+            (
+                match.Status ==
+                    MatchStatus.InProgress ||
+                match.Status ==
+                    MatchStatus.Paused ||
+                match.Status ==
+                    MatchStatus.Finished
+            );
+
+        if (!isParticipant && !canSpectate)
+        {
+            return Results.Forbid();
         }
 
         return Results.Ok(ToDetailsResponse(match));
@@ -454,6 +664,8 @@ public static class MatchEndpoints
             match.OpponentUserId,
             match.OpponentUser?.UserName,
             match.Mode.ToString(),
+            match.Visibility.ToString(),
+            match.JoinCode,
             match.BoardSize,
             match.WinLength,
             match.Status.ToString(),
@@ -498,6 +710,7 @@ public static class MatchEndpoints
                     match.Status == MatchStatus.Paused
                 ) &&
                 match.OwnerUserId != userId &&
+                match.Visibility == MatchVisibility.Public &&
                 match.OpponentUserId != userId)
             .OrderByDescending(
                 match => match.CreatedAt)
@@ -554,6 +767,7 @@ public static class MatchEndpoints
                     ? null
                     : match.OpponentUser.UserName,
                 match.Mode.ToString(),
+                match.Visibility.ToString(),
                 match.BoardSize,
                 match.WinLength,
                 match.Status.ToString(),
@@ -600,6 +814,7 @@ public static class MatchEndpoints
                     ? null
                     : match.OpponentUser.UserName,
                 match.Mode.ToString(),
+                match.Visibility.ToString(),
                 match.BoardSize,
                 match.WinLength,
                 match.Status.ToString(),

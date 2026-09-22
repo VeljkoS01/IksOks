@@ -1,6 +1,7 @@
 ﻿using IksOks.Web.Domain.Entities;
-using Microsoft.EntityFrameworkCore;
+using IksOks.Web.Domain.Enums;
 using IksOks.Web.Infrastructure.Persistence.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace IksOks.Web.Infrastructure.Persistence;
 
@@ -44,6 +45,8 @@ public sealed class IksOksDbContext : DbContext
         user.Property(x => x.TokenBalance)
             .HasDefaultValue(30)
             .IsRequired();
+
+        user.Property(x => x.ActiveBorderKey).HasMaxLength(64);
 
         user.Property(x => x.CreatedAt)
             .IsRequired();
@@ -113,6 +116,18 @@ public sealed class IksOksDbContext : DbContext
             .HasConversion<string>()
             .HasMaxLength(32)
             .IsRequired();
+
+        match.Property(x => x.Visibility)
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .HasDefaultValue(MatchVisibility.Public)
+            .IsRequired();
+
+        match.Property(x => x.JoinCode)
+            .HasMaxLength(12);
+
+        match.HasIndex(x => x.JoinCode)
+            .IsUnique();
 
         match.HasOne(x => x.PauseRequestedByUser)
             .WithMany()
