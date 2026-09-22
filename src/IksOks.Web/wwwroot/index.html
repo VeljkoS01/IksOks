@@ -130,7 +130,19 @@
                                    value="3"
                                    required>
                         </div>
+                        <label for="match-visibility">
+                            Vidljivost meča
+                        </label>
 
+                        <select id="match-visibility">
+                            <option value="Public">
+                                Javan
+                            </option>
+
+                            <option value="Private">
+                                Privatan
+                            </option>
+                        </select>
                         <button class="primary-button"
                                 type="submit">
                             Napravi meč
@@ -155,6 +167,29 @@
                     </div>
 
                     <div id="matches-list" class="matches-list"></div>
+                    <div class="private-match-join">
+                        <label for="private-match-code">
+                            Kod privatnog meča
+                        </label>
+
+                        <div class="private-match-join-row">
+                            <input id="private-match-code"
+                                   type="text"
+                                   maxlength="8"
+                                   autocomplete="off"
+                                   placeholder="npr. 7FA2C91D">
+
+                            <button id="join-private-match-button"
+                                    class="secondary-button"
+                                    type="button">
+                                Pridruži se kodom
+                            </button>
+                        </div>
+
+                        <p id="private-match-message"
+                           class="message">
+                        </p>
+                    </div>
                 </section>
             </div>
             <div class="personal-matches-grid">
@@ -197,7 +232,7 @@
                 </section>
             </div>
             <div class="profile-leaderboard-grid">
-                <section class="dashboard-card">
+                <section id="profile-card" class="dashboard-card">
                     <div class="matches-header">
                         <h2>Moj profil</h2>
 
@@ -244,6 +279,11 @@
                             type="button">
                         Osveži
                     </button>
+                    <button id="clear-border-button"
+                            class="secondary-button"
+                            type="button">
+                        Bez okvira
+                    </button>
                 </div>
 
                 <div id="store-list"
@@ -256,12 +296,11 @@
                 <div>
                     <h2 id="match-title">IksOks meč</h2>
                     <p id="match-status" class="match-status"></p>
-                    <p id="turn-timer"
-                       class="turn-timer">
-                    </p>
+                    <p id="match-join-code" class="match-join-code hidden"></p>
+                    <p id="turn-timer" class="turn-timer"></p>
                 </div>
 
-                <div class="match-symbol">
+                <div id="player-badge" class="match-symbol">
                     Tvoj znak:
                     <strong id="player-symbol">-</strong>
                 </div>
