@@ -142,6 +142,10 @@ public sealed class IksOksDbContext : DbContext
         match.Property(x => x.TurnDurationSeconds)
             .IsRequired();
 
+        match.Property(x => x.SharedNote)
+            .HasMaxLength(1000)
+            .IsRequired();
+
         var move = modelBuilder.Entity<MatchMove>();
 
         move.ToTable("MatchMoves");

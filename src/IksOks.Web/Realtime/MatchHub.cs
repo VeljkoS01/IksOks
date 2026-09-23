@@ -5,13 +5,13 @@ using IksOks.Web.Infrastructure.Persistence;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using IksOks.Web.Domain.Store;
+using IksOks.Web.Realtime.Collaboration;
 
 namespace IksOks.Web.Realtime;
 
 public sealed class MatchHub : Hub
 {
-    private static readonly HashSet<string> BasicEmojis =
-    new(StringComparer.Ordinal)
+    private static readonly HashSet<string> BasicEmojis = new(StringComparer.Ordinal)
     {
         "😀",
         "😂",
@@ -23,10 +23,12 @@ public sealed class MatchHub : Hub
         "😡"
     };
     private readonly IksOksDbContext _db;
+    private readonly MatchViewerRegistry _viewerRegistry;
 
-    public MatchHub(IksOksDbContext db)
+    public MatchHub(IksOksDbContext db, MatchViewerRegistry viewerRegistry)
     {
         _db = db;
+        _viewerRegistry = viewerRegistry;
     }
 
     public static string GroupName(Guid matchId)
@@ -84,11 +86,25 @@ public sealed class MatchHub : Hub
             Context.ConnectionId,
             GroupName(matchId),
             Context.ConnectionAborted);
+
+        var access =
+            _viewerRegistry.Join(
+                matchId,
+                userId,
+                Context.ConnectionId);
+
+        await Clients.Caller.SendAsync(
+            "MatchAccessChanged",
+            new
+            {
+                matchId,
+                canEditSharedNote =
+                    access.CanEdit
+            },
+            Context.ConnectionAborted);
     }
 
-    public async Task SendEmoji(
-    Guid matchId,
-    string emoji)
+    public async Task SendEmoji(Guid matchId, string emoji)
     {
         var userIdValue = Context.User?
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -184,11 +200,124 @@ public sealed class MatchHub : Hub
                 Context.ConnectionAborted);
     }
 
+    private async Task NotifyAccessChangedAsync(Guid matchId)
+    {
+        var viewers =
+            _viewerRegistry.GetAccess(
+                matchId);
+
+        foreach (var viewer in viewers)
+        {
+            await Clients
+                .Client(viewer.ConnectionId)
+                .SendAsync(
+                    "MatchAccessChanged",
+                    new
+                    {
+                        matchId,
+                        canEditSharedNote =
+                            viewer.CanEdit
+                    },
+                    Context.ConnectionAborted);
+        }
+    }
+
+    public async Task UpdateSharedNote(Guid matchId, string text)
+    {
+        var userIdValue = Context.User?
+            .FindFirst(
+                ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out _))
+        {
+            throw new HubException(
+                "Authenticated user was not found.");
+        }
+
+        if (!_viewerRegistry.CanEdit(
+            matchId,
+            Context.ConnectionId))
+        {
+            throw new HubException(
+                "You currently have read-only access.");
+        }
+
+        var normalizedText =
+            (text ?? string.Empty)
+                .Trim();
+
+        if (normalizedText.Length > 1000)
+        {
+            throw new HubException(
+                "Shared note is too long.");
+        }
+
+        var match = await _db.Matches
+            .SingleOrDefaultAsync(
+                match =>
+                    match.Id == matchId,
+                Context.ConnectionAborted);
+
+        if (match is null)
+        {
+            throw new HubException(
+                "Match was not found.");
+        }
+
+        match.SharedNote =
+            normalizedText;
+
+        await _db.SaveChangesAsync(
+            Context.ConnectionAborted);
+
+        await Clients
+            .Group(GroupName(matchId))
+            .SendAsync(
+                "SharedNoteUpdated",
+                new
+                {
+                    matchId,
+                    text = match.SharedNote
+                },
+                Context.ConnectionAborted);
+    }
+
     public async Task LeaveMatch(Guid matchId)
     {
+        var promotedUserId =
+            _viewerRegistry.Leave(
+                matchId,
+                Context.ConnectionId);
+
         await Groups.RemoveFromGroupAsync(
             Context.ConnectionId,
             GroupName(matchId),
             Context.ConnectionAborted);
+
+        if (promotedUserId is not null)
+        {
+            await NotifyAccessChangedAsync(
+                matchId);
+        }
+    }
+
+    public override async Task OnDisconnectedAsync(Exception? exception)
+    {
+        var promotions =
+            _viewerRegistry.RemoveConnection(
+                Context.ConnectionId);
+
+        foreach (var promotion
+            in promotions)
+        {
+            await NotifyAccessChangedAsync(
+                promotion.MatchId);
+        }
+
+        await base.OnDisconnectedAsync(
+            exception);
     }
 }
