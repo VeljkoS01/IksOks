@@ -12,6 +12,7 @@ using IksOks.Web.Application.Commands;
 using IksOks.Web.Application.Commands.Matches;
 using IksOks.Web.Application.Background;
 using IksOks.Web.Realtime.Collaboration;
+using IksOks.Web.Application.Concurrency;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -49,6 +50,7 @@ builder.Services
 
 builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<MatchOperationLock>();
 builder.Services.AddSingleton<MatchViewerRegistry>();
 
 builder.Services.Configure<RabbitMqOptions>(

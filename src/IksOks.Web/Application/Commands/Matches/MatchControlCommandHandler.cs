@@ -1,6 +1,7 @@
 ﻿using IksOks.Web.Domain.States;
 using IksOks.Web.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
+using IksOks.Web.Application.Concurrency;
 
 namespace IksOks.Web.Application.Commands.Matches;
 
@@ -26,19 +27,27 @@ public sealed class MatchControlCommandHandler
 {
     private readonly IksOksDbContext _db;
     private readonly MatchStateFactory _stateFactory;
+    private readonly MatchOperationLock _matchOperationLock;
 
     public MatchControlCommandHandler(
         IksOksDbContext db,
-        MatchStateFactory stateFactory)
+        MatchStateFactory stateFactory,
+        MatchOperationLock matchOperationLock)
     {
         _db = db;
         _stateFactory = stateFactory;
+        _matchOperationLock = matchOperationLock;
     }
 
     public async Task<MatchControlCommandResult> HandleAsync(
         RequestPauseCommand command,
         CancellationToken cancellationToken)
     {
+        using var operationLock =
+            await _matchOperationLock.AcquireAsync(
+            command.MatchId,
+            cancellationToken);
+
         var match = await _db.Matches
             .SingleOrDefaultAsync(
                 match =>
@@ -86,9 +95,15 @@ public sealed class MatchControlCommandHandler
     }
 
     public async Task<MatchControlCommandResult> HandleAsync(
-    PauseMatchCommand command,
-    CancellationToken cancellationToken)
+        PauseMatchCommand command,
+        CancellationToken cancellationToken)
     {
+
+        using var operationLock =
+            await _matchOperationLock.AcquireAsync(
+            command.MatchId,
+            cancellationToken);
+
         var match = await _db.Matches
             .SingleOrDefaultAsync(
                 match => match.Id == command.MatchId,
@@ -110,6 +125,12 @@ public sealed class MatchControlCommandHandler
             _stateFactory.GetState(match.Status);
 
         if (!state.CanPause(match))
+        {
+            return MatchControlCommandResult.Failed(
+                MatchControlFailure.InvalidState);
+        }
+
+        if (match.TurnDeadlineAt is not null && match.TurnDeadlineAt <= DateTimeOffset.UtcNow)
         {
             return MatchControlCommandResult.Failed(
                 MatchControlFailure.InvalidState);
@@ -149,6 +170,12 @@ public sealed class MatchControlCommandHandler
         RejectPauseRequestCommand command,
         CancellationToken cancellationToken)
     {
+
+        using var operationLock =
+            await _matchOperationLock.AcquireAsync(
+            command.MatchId,
+            cancellationToken);
+
         var match = await _db.Matches
             .SingleOrDefaultAsync(
                 match =>
@@ -196,6 +223,12 @@ public sealed class MatchControlCommandHandler
     ResumeMatchCommand command,
     CancellationToken cancellationToken)
     {
+
+        using var operationLock =
+            await _matchOperationLock.AcquireAsync(
+            command.MatchId,
+            cancellationToken);
+
         var match = await _db.Matches
             .SingleOrDefaultAsync(
                 match => match.Id == command.MatchId,
@@ -251,6 +284,12 @@ public sealed class MatchControlCommandHandler
     RequestResumeCommand command,
     CancellationToken cancellationToken)
     {
+
+        using var operationLock =
+            await _matchOperationLock.AcquireAsync(
+            command.MatchId,
+            cancellationToken);
+
         var match = await _db.Matches
             .SingleOrDefaultAsync(
                 match => match.Id == command.MatchId,
@@ -300,6 +339,12 @@ public sealed class MatchControlCommandHandler
     RejectResumeRequestCommand command,
     CancellationToken cancellationToken)
     {
+
+        using var operationLock =
+            await _matchOperationLock.AcquireAsync(
+            command.MatchId,
+            cancellationToken);
+
         var match = await _db.Matches
             .SingleOrDefaultAsync(
                 match => match.Id == command.MatchId,

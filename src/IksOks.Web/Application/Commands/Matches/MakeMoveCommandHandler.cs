@@ -7,6 +7,7 @@ using IksOks.Web.Infrastructure.Persistence;
 using IksOks.Web.Infrastructure.Persistence.Entities;
 using IksOks.Web.Messaging.Contracts;
 using Microsoft.EntityFrameworkCore;
+using IksOks.Web.Application.Concurrency;
 
 namespace IksOks.Web.Application.Commands.Matches;
 
@@ -17,23 +18,30 @@ public sealed class MakeMoveCommandHandler
 {
     private readonly IksOksDbContext _db;
     private readonly MatchStateFactory _stateFactory;
-    private readonly GameRulesStrategyFactory
-        _strategyFactory;
+    private readonly GameRulesStrategyFactory _strategyFactory;
+    private readonly MatchOperationLock _matchOperationLock;
 
     public MakeMoveCommandHandler(
-        IksOksDbContext db,
-        MatchStateFactory stateFactory,
-        GameRulesStrategyFactory strategyFactory)
+         IksOksDbContext db,
+         MatchStateFactory stateFactory,
+         GameRulesStrategyFactory strategyFactory,
+         MatchOperationLock matchOperationLock)
     {
         _db = db;
         _stateFactory = stateFactory;
         _strategyFactory = strategyFactory;
+        _matchOperationLock = matchOperationLock;
     }
 
     public async Task<MakeMoveCommandResult> HandleAsync(
         MakeMoveCommand command,
         CancellationToken cancellationToken)
     {
+        using var operationLock =
+            await _matchOperationLock.AcquireAsync(
+                command.MatchId,
+                cancellationToken);
+
         await using var transaction =
             await _db.Database.BeginTransactionAsync(
                 cancellationToken);
@@ -58,6 +66,12 @@ public sealed class MakeMoveCommandHandler
         {
             return MakeMoveCommandResult.Failed(
                 MakeMoveFailure.MatchNotInProgress);
+        }
+
+        if (match.TurnDeadlineAt is not null && match.TurnDeadlineAt <= DateTimeOffset.UtcNow)
+        {
+            return MakeMoveCommandResult.Failed(
+                MakeMoveFailure.TurnExpired);
         }
 
         if (match.OpponentUserId
