@@ -45,12 +45,9 @@ const profileCard = document.querySelector("#profile-card");
 const playerBadge = document.querySelector("#player-badge");
 const matchControls = document.querySelector("#match-controls");
 const turnTimer = document.querySelector("#turn-timer");
+const matchControlRole = document.querySelector("#match-control-role");
 const emojiChatMessages = document.querySelector("#emoji-chat-messages");
 const emojiChatActions = document.querySelector("#emoji-chat-actions");
-const sharedNoteInput = document.querySelector("#shared-note-input");
-const sharedNoteRole = document.querySelector("#shared-note-role");
-const saveSharedNoteButton = document.querySelector("#save-shared-note-button");
-const sharedNoteMessage = document.querySelector("#shared-note-message");
 const clearBorderButton = document.querySelector("#clear-border-button");
 const basicEmojis = [
     "😀",
@@ -73,7 +70,6 @@ let hubConnection = null;
 let hubStartPromise = null;
 let timerIntervalId = null;
 let currentDeadline = null;
-let canEditSharedNote = false;
 
 loginTab.addEventListener("click", () => {
     setMode("login");
@@ -233,13 +229,8 @@ function resetMatchView() {
     matchStatus.textContent = "";
     playerSymbol.textContent = "";
     gameMessage.textContent = "";
-    canEditSharedNote = false;
-    sharedNoteInput.value = "";
-    sharedNoteInput.readOnly = true;
-    sharedNoteRole.textContent = "";
-    sharedNoteMessage.textContent = "";
-
-    saveSharedNoteButton.classList.add("hidden");
+    canControlMatch = false;
+    matchControlRole.textContent = "";
     matchView.classList.add("hidden");
     lobbyView.classList.remove("hidden");
 }
@@ -519,8 +510,7 @@ async function joinPrivateMatch() {
 
         await openMatch(match.id);
     } catch {
-        privateMatchMessage.textContent =
-            "Nije moguće pridružiti se privatnom meču.";
+        privateMatchMessage.textContent = "Nije moguće pridružiti se privatnom meču.";
     }
 }
 
@@ -534,18 +524,9 @@ async function openMatch(matchId) {
     emojiChatMessages.replaceChildren();
     emojiChatActions.replaceChildren();
 
-    canEditSharedNote = false;
+    canControlMatch = false;
 
-    sharedNoteInput.value = "";
-    sharedNoteInput.readOnly = true;
-
-    sharedNoteRole.textContent =
-        "Povezivanje...";
-
-    sharedNoteMessage.textContent = "";
-
-    saveSharedNoteButton.classList
-        .add("hidden");
+    matchControlRole.textContent = "Povezivanje kontrole...";
 
     activeMatchId = matchId;
 
@@ -568,8 +549,7 @@ async function loadActiveMatch() {
             `/api/matches/${activeMatchId}`);
 
         if (!response.ok) {
-            gameMessage.textContent =
-                "Nije moguće učitati meč.";
+            gameMessage.textContent = "Nije moguće učitati meč.";
 
             return;
         }
@@ -578,8 +558,7 @@ async function loadActiveMatch() {
 
         renderMatch(match);
     } catch {
-        gameMessage.textContent =
-            "Server trenutno nije dostupan.";
+        gameMessage.textContent = "Server trenutno nije dostupan.";
     }
 }
 
@@ -634,7 +613,6 @@ function renderMatch(match) {
 
     renderMatchControls(match);
     renderEmojiChatControls(match);
-    renderSharedNote(match);
 }
 
 function renderBoard(match) {
@@ -722,12 +700,12 @@ function updateMatchStatus(match) {
             return;
         }
 
-        if (match.ownerUserId === currentUser.id) {
+        if (canControlMatch) {
             gameMessage.textContent =
-                "Možete nastaviti meč kada budete spremni.";
+                "Vi kontrolišete meč i možete da ga nastavite.";
         } else {
             gameMessage.textContent =
-                "Sačekajte da vlasnik meča nastavi partiju.";
+                "Možete zatražiti nastavak od trenutnog kontrolera.";
         }
 
         return;
@@ -837,13 +815,9 @@ async function closeMatch() {
     emojiChatMessages.replaceChildren();
     emojiChatActions.replaceChildren();
 
-    canEditSharedNote = false;
-    sharedNoteInput.value = "";
-    sharedNoteInput.readOnly = true;
-    sharedNoteRole.textContent = "";
-    sharedNoteMessage.textContent = "";
+    canControlMatch = false;
+    matchControlRole.textContent = "";
 
-    saveSharedNoteButton.classList.add("hidden");
     matchView.classList.add("hidden");
     lobbyView.classList.remove("hidden");
 
@@ -887,50 +861,30 @@ function createHubConnection() {
         });
 
     hubConnection.on(
-        "MatchAccessChanged",
-        access => {
+        "MatchControlChanged",
+        async control => {
             if (!activeMatchId) {
                 return;
             }
 
             if (
-                String(access.matchId)
+                String(control.matchId)
                     .toLowerCase() !==
-                activeMatchId
+                String(activeMatchId)
                     .toLowerCase()
             ) {
                 return;
             }
 
-            canEditSharedNote =
-                access.canEditSharedNote;
+            canControlMatch =
+                control.controllerUserId !== null &&
+                String(
+                    control.controllerUserId)
+                    .toLowerCase() ===
+                String(currentUser.id)
+                    .toLowerCase();
 
-            sharedNoteMessage.textContent =
-                canEditSharedNote
-                    ? "Dobili ste pravo uređivanja."
-                    : "Belešku trenutno uređuje drugi korisnik.";
-
-            updateSharedNoteAccess();
-        });
-
-    hubConnection.on(
-        "SharedNoteUpdated",
-        update => {
-            if (!activeMatchId) {
-                return;
-            }
-
-            if (
-                String(update.matchId)
-                    .toLowerCase() !==
-                activeMatchId
-                    .toLowerCase()
-            ) {
-                return;
-            }
-
-            sharedNoteInput.value =
-                update.text ?? "";
+            await loadActiveMatch();
         });
 
     hubConnection.on(
@@ -999,6 +953,8 @@ function createHubConnection() {
             if (activeMatchId) {
                 await joinMatchGroup(
                     activeMatchId);
+
+                await loadActiveMatch();
             } else if (currentUser) {
                 await Promise.all([
                     loadMatches(),
@@ -1015,6 +971,13 @@ function createHubConnection() {
             if (!activeMatchId) {
                 return;
             }
+
+            canControlMatch = false;
+
+            matchControls.replaceChildren();
+
+            matchControlRole.textContent =
+                "Kontrola se ponovo uspostavlja...";
 
             gameMessage.textContent =
                 "Live veza se ponovo uspostavlja...";
@@ -1083,14 +1046,25 @@ async function joinMatchGroup(matchId) {
         await ensureRealtimeConnected();
 
     if (!connected) {
+        canControlMatch = false;
         return;
     }
 
     try {
-        await hubConnection.invoke(
-            "JoinMatch",
-            matchId);
+        const controllerUserId =
+            await hubConnection.invoke(
+                "JoinMatch",
+                matchId);
+
+        canControlMatch =
+            controllerUserId !== null &&
+            String(controllerUserId)
+                .toLowerCase() ===
+            String(currentUser.id)
+                .toLowerCase();
     } catch (error) {
+        canControlMatch = false;
+
         console.error(
             "Could not join SignalR match group:",
             error);
@@ -1991,10 +1965,6 @@ refreshStoreButton.addEventListener(
     "click",
     loadStore);
 
-saveSharedNoteButton.addEventListener(
-    "click",
-    saveSharedNote);
-
 function updateMatchModeFields() {
     const mode = matchModeInput.value;
 
@@ -2175,106 +2145,50 @@ function appendEmojiMessage(chatMessage) {
         emojiChatMessages.scrollHeight;
 }
 
-function renderSharedNote(match) {
-    if (
-        document.activeElement !==
-        sharedNoteInput
-    ) {
-        sharedNoteInput.value =
-            match.sharedNote ?? "";
-    }
-
-    updateSharedNoteAccess();
-}
-
-function updateSharedNoteAccess() {
-    sharedNoteInput.readOnly =
-        !canEditSharedNote;
-
-    if (canEditSharedNote) {
-        sharedNoteRole.textContent =
-            "Uređivač";
-
-        saveSharedNoteButton.classList
-            .remove("hidden");
-    } else {
-        sharedNoteRole.textContent =
-            "Samo čitanje";
-
-        saveSharedNoteButton.classList
-            .add("hidden");
-    }
-}
-
-async function saveSharedNote() {
-    if (
-        !activeMatchId ||
-        !canEditSharedNote
-    ) {
-        return;
-    }
-
-    const connected =
-        await ensureRealtimeConnected();
-
-    if (!connected) {
-        sharedNoteMessage.textContent =
-            "Live veza nije dostupna.";
-
-        return;
-    }
-
-    try {
-        await hubConnection.invoke(
-            "UpdateSharedNote",
-            activeMatchId,
-            sharedNoteInput.value);
-
-        sharedNoteMessage.textContent =
-            "Beleška je sačuvana.";
-    } catch (error) {
-        console.error(
-            "Could not save shared note:",
-            error);
-
-        sharedNoteMessage.textContent =
-            "Belešku nije moguće sačuvati.";
-    }
-}
-
 function renderMatchControls(match) {
     matchControls.replaceChildren();
 
-    const isOwner =
-        match.ownerUserId === currentUser.id;
-
-    const isOpponent =
+    const isParticipant =
+        match.ownerUserId === currentUser.id ||
         match.opponentUserId === currentUser.id;
 
-    if (match.status === "InProgress") {
-        if (isOwner) {
-            renderOwnerInProgressControls(match);
-            return;
-        }
+    if (!isParticipant) {
+        matchControlRole.textContent =
+            "Gledalac · bez kontrole meča";
 
-        if (isOpponent) {
-            renderOpponentInProgressControls(match);
+        return;
+    }
+
+    if (match.status === "Finished") {
+        matchControlRole.textContent = "";
+        return;
+    }
+
+    matchControlRole.textContent =
+        canControlMatch
+            ? "Kontrola meča: vi"
+            : "Kontrola meča: drugi igrač";
+
+    if (match.status === "InProgress") {
+        if (canControlMatch) {
+            renderControllerInProgressControls(
+                match);
+        } else {
+            renderRequesterInProgressControls(
+                match);
         }
 
         return;
     }
 
     if (match.status === "Paused") {
-        if (isOwner) {
-            renderOwnerPausedControls(match);
-            return;
+        if (canControlMatch) {
+            renderControllerPausedControls(
+                match);
+        } else {
+            renderRequesterPausedControls(
+                match);
         }
-
-        if (isOpponent) {
-            renderOpponentPausedControls(match);
-        }
-
-        return;
     }
 }
 
@@ -2303,7 +2217,7 @@ function createControlButton(
     return button;
 }
 
-function renderOwnerInProgressControls(match) {
+function renderControllerInProgressControls(match) {
     if (match.pauseRequestedByUserId) {
         const requestText =
             document.createElement("p");
@@ -2351,7 +2265,7 @@ function renderOwnerInProgressControls(match) {
         pauseButton);
 }
 
-function renderOpponentInProgressControls(match) {
+function renderRequesterInProgressControls(match) {
     if (
         match.pauseRequestedByUserId ===
         currentUser.id
@@ -2378,7 +2292,7 @@ function renderOpponentInProgressControls(match) {
         requestButton);
 }
 
-function renderOwnerPausedControls(match) {
+function renderControllerPausedControls(match) {
     if (match.resumeRequestedByUserId) {
         const text =
             document.createElement("p");
@@ -2423,7 +2337,7 @@ function renderOwnerPausedControls(match) {
             resumeMatch));
 }
 
-function renderOpponentPausedControls(match) {
+function renderRequesterPausedControls(match) {
     if (
         match.resumeRequestedByUserId ===
         currentUser.id
