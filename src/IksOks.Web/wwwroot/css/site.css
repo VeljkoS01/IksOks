@@ -598,3 +598,41 @@ input {
     border-radius: 8px;
     font-weight: 700;
 }
+
+.shared-note {
+    width: min(90vw, 520px);
+    margin: 20px auto 0;
+    padding: 14px;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 10px;
+}
+
+.shared-note-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.shared-note-role {
+    color: #6b7280;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.shared-note textarea {
+    width: 100%;
+    box-sizing: border-box;
+    resize: vertical;
+    min-height: 90px;
+}
+
+    .shared-note textarea[readonly] {
+        background: #f3f4f6;
+        cursor: default;
+    }
+
+.shared-note button {
+    margin-top: 10px;
+}

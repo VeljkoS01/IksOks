@@ -47,8 +47,11 @@ const matchControls = document.querySelector("#match-controls");
 const turnTimer = document.querySelector("#turn-timer");
 const emojiChatMessages = document.querySelector("#emoji-chat-messages");
 const emojiChatActions = document.querySelector("#emoji-chat-actions");
+const sharedNoteInput = document.querySelector("#shared-note-input");
+const sharedNoteRole = document.querySelector("#shared-note-role");
+const saveSharedNoteButton = document.querySelector("#save-shared-note-button");
+const sharedNoteMessage = document.querySelector("#shared-note-message");
 const clearBorderButton = document.querySelector("#clear-border-button");
-
 const basicEmojis = [
     "😀",
     "😂",
@@ -70,6 +73,7 @@ let hubConnection = null;
 let hubStartPromise = null;
 let timerIntervalId = null;
 let currentDeadline = null;
+let canEditSharedNote = false;
 
 loginTab.addEventListener("click", () => {
     setMode("login");
@@ -224,11 +228,18 @@ function resetMatchView() {
     emojiChatMessages.replaceChildren();
     emojiChatActions.replaceChildren();
 
+
     matchTitle.textContent = "";
     matchStatus.textContent = "";
     playerSymbol.textContent = "";
     gameMessage.textContent = "";
+    canEditSharedNote = false;
+    sharedNoteInput.value = "";
+    sharedNoteInput.readOnly = true;
+    sharedNoteRole.textContent = "";
+    sharedNoteMessage.textContent = "";
 
+    saveSharedNoteButton.classList.add("hidden");
     matchView.classList.add("hidden");
     lobbyView.classList.remove("hidden");
 }
@@ -523,6 +534,19 @@ async function openMatch(matchId) {
     emojiChatMessages.replaceChildren();
     emojiChatActions.replaceChildren();
 
+    canEditSharedNote = false;
+
+    sharedNoteInput.value = "";
+    sharedNoteInput.readOnly = true;
+
+    sharedNoteRole.textContent =
+        "Povezivanje...";
+
+    sharedNoteMessage.textContent = "";
+
+    saveSharedNoteButton.classList
+        .add("hidden");
+
     activeMatchId = matchId;
 
     lobbyView.classList.add("hidden");
@@ -610,6 +634,7 @@ function renderMatch(match) {
 
     renderMatchControls(match);
     renderEmojiChatControls(match);
+    renderSharedNote(match);
 }
 
 function renderBoard(match) {
@@ -812,6 +837,13 @@ async function closeMatch() {
     emojiChatMessages.replaceChildren();
     emojiChatActions.replaceChildren();
 
+    canEditSharedNote = false;
+    sharedNoteInput.value = "";
+    sharedNoteInput.readOnly = true;
+    sharedNoteRole.textContent = "";
+    sharedNoteMessage.textContent = "";
+
+    saveSharedNoteButton.classList.add("hidden");
     matchView.classList.add("hidden");
     lobbyView.classList.remove("hidden");
 
@@ -852,6 +884,53 @@ function createHubConnection() {
             }
 
             await loadActiveMatch();
+        });
+
+    hubConnection.on(
+        "MatchAccessChanged",
+        access => {
+            if (!activeMatchId) {
+                return;
+            }
+
+            if (
+                String(access.matchId)
+                    .toLowerCase() !==
+                activeMatchId
+                    .toLowerCase()
+            ) {
+                return;
+            }
+
+            canEditSharedNote =
+                access.canEditSharedNote;
+
+            sharedNoteMessage.textContent =
+                canEditSharedNote
+                    ? "Dobili ste pravo uređivanja."
+                    : "Belešku trenutno uređuje drugi korisnik.";
+
+            updateSharedNoteAccess();
+        });
+
+    hubConnection.on(
+        "SharedNoteUpdated",
+        update => {
+            if (!activeMatchId) {
+                return;
+            }
+
+            if (
+                String(update.matchId)
+                    .toLowerCase() !==
+                activeMatchId
+                    .toLowerCase()
+            ) {
+                return;
+            }
+
+            sharedNoteInput.value =
+                update.text ?? "";
         });
 
     hubConnection.on(
@@ -1912,6 +1991,10 @@ refreshStoreButton.addEventListener(
     "click",
     loadStore);
 
+saveSharedNoteButton.addEventListener(
+    "click",
+    saveSharedNote);
+
 function updateMatchModeFields() {
     const mode = matchModeInput.value;
 
@@ -2090,6 +2173,73 @@ function appendEmojiMessage(chatMessage) {
 
     emojiChatMessages.scrollTop =
         emojiChatMessages.scrollHeight;
+}
+
+function renderSharedNote(match) {
+    if (
+        document.activeElement !==
+        sharedNoteInput
+    ) {
+        sharedNoteInput.value =
+            match.sharedNote ?? "";
+    }
+
+    updateSharedNoteAccess();
+}
+
+function updateSharedNoteAccess() {
+    sharedNoteInput.readOnly =
+        !canEditSharedNote;
+
+    if (canEditSharedNote) {
+        sharedNoteRole.textContent =
+            "Uređivač";
+
+        saveSharedNoteButton.classList
+            .remove("hidden");
+    } else {
+        sharedNoteRole.textContent =
+            "Samo čitanje";
+
+        saveSharedNoteButton.classList
+            .add("hidden");
+    }
+}
+
+async function saveSharedNote() {
+    if (
+        !activeMatchId ||
+        !canEditSharedNote
+    ) {
+        return;
+    }
+
+    const connected =
+        await ensureRealtimeConnected();
+
+    if (!connected) {
+        sharedNoteMessage.textContent =
+            "Live veza nije dostupna.";
+
+        return;
+    }
+
+    try {
+        await hubConnection.invoke(
+            "UpdateSharedNote",
+            activeMatchId,
+            sharedNoteInput.value);
+
+        sharedNoteMessage.textContent =
+            "Beleška je sačuvana.";
+    } catch (error) {
+        console.error(
+            "Could not save shared note:",
+            error);
+
+        sharedNoteMessage.textContent =
+            "Belešku nije moguće sačuvati.";
+    }
 }
 
 function renderMatchControls(match) {

@@ -325,7 +325,34 @@
                      class="emoji-chat-actions">
                 </div>
             </section>
+            <section class="shared-note">
+                <div class="shared-note-header">
+                    <strong>
+                        Zajednička beleška
+                    </strong>
 
+                    <span id="shared-note-role"
+                          class="shared-note-role">
+                    </span>
+                </div>
+
+                <textarea id="shared-note-input"
+                          maxlength="1000"
+                          rows="4"
+                          readonly
+                          placeholder="Zajednička beleška meča...">
+                </textarea>
+
+                <button id="save-shared-note-button"
+                        class="secondary-button hidden"
+                        type="button">
+                    Sačuvaj belešku
+                </button>
+
+                <p id="shared-note-message"
+                   class="message">
+                </p>
+            </section>
             <p id="game-message"
                class="message"
                aria-live="polite">
