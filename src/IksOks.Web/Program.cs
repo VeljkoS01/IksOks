@@ -51,7 +51,7 @@ builder.Services
 builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<MatchOperationLock>();
-builder.Services.AddSingleton<MatchViewerRegistry>();
+builder.Services.AddSingleton<MatchControlRegistry>();
 
 builder.Services.Configure<RabbitMqOptions>(
     builder.Configuration.GetSection(

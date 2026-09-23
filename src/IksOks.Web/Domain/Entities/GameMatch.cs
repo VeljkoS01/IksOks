@@ -20,8 +20,6 @@ public sealed class GameMatch
 
     public MatchStatus Status { get; set; } = MatchStatus.WaitingForOpponent;
 
-    public string SharedNote { get; set; } = string.Empty;
-
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public Guid? WinnerUserId { get; set; }

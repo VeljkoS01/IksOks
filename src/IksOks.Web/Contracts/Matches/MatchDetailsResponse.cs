@@ -25,5 +25,4 @@ public sealed record MatchDetailsResponse(
     string? WinnerUserName,
     DateTimeOffset CreatedAt,
     DateTimeOffset? FinishedAt,
-    string SharedNote,
     IReadOnlyList<MoveResponse> Moves);

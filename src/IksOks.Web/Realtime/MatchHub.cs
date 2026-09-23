@@ -23,12 +23,12 @@ public sealed class MatchHub : Hub
         "😡"
     };
     private readonly IksOksDbContext _db;
-    private readonly MatchViewerRegistry _viewerRegistry;
+    private readonly MatchControlRegistry _controlRegistry;
 
-    public MatchHub(IksOksDbContext db, MatchViewerRegistry viewerRegistry)
+    public MatchHub(IksOksDbContext db, MatchControlRegistry controlRegistry)
     {
         _db = db;
-        _viewerRegistry = viewerRegistry;
+        _controlRegistry = controlRegistry;
     }
 
     public static string GroupName(Guid matchId)
@@ -36,7 +36,7 @@ public sealed class MatchHub : Hub
         return $"match:{matchId}";
     }
 
-    public async Task JoinMatch(Guid matchId)
+    public async Task<Guid?> JoinMatch(Guid matchId)
     {
         var userIdValue = Context.User?
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -87,21 +87,17 @@ public sealed class MatchHub : Hub
             GroupName(matchId),
             Context.ConnectionAborted);
 
-        var access =
-            _viewerRegistry.Join(
+        if (isParticipant)
+        {
+            _controlRegistry.Join(
                 matchId,
                 userId,
                 Context.ConnectionId);
+        }
 
-        await Clients.Caller.SendAsync(
-            "MatchAccessChanged",
-            new
-            {
-                matchId,
-                canEditSharedNote =
-                    access.CanEdit
-            },
-            Context.ConnectionAborted);
+        return _controlRegistry
+            .GetControllerUserId(
+                matchId);
     }
 
     public async Task SendEmoji(Guid matchId, string emoji)
@@ -200,95 +196,74 @@ public sealed class MatchHub : Hub
                 Context.ConnectionAborted);
     }
 
-    private async Task NotifyAccessChangedAsync(Guid matchId)
+    private async Task ClearPendingControlRequestsAsync(
+    Guid matchId)
     {
-        var viewers =
-            _viewerRegistry.GetAccess(
-                matchId);
-
-        foreach (var viewer in viewers)
-        {
-            await Clients
-                .Client(viewer.ConnectionId)
-                .SendAsync(
-                    "MatchAccessChanged",
-                    new
-                    {
-                        matchId,
-                        canEditSharedNote =
-                            viewer.CanEdit
-                    },
-                    Context.ConnectionAborted);
-        }
-    }
-
-    public async Task UpdateSharedNote(Guid matchId, string text)
-    {
-        var userIdValue = Context.User?
-            .FindFirst(
-                ClaimTypes.NameIdentifier)?
-            .Value;
-
-        if (!Guid.TryParse(
-            userIdValue,
-            out _))
-        {
-            throw new HubException(
-                "Authenticated user was not found.");
-        }
-
-        if (!_viewerRegistry.CanEdit(
-            matchId,
-            Context.ConnectionId))
-        {
-            throw new HubException(
-                "You currently have read-only access.");
-        }
-
-        var normalizedText =
-            (text ?? string.Empty)
-                .Trim();
-
-        if (normalizedText.Length > 1000)
-        {
-            throw new HubException(
-                "Shared note is too long.");
-        }
-
         var match = await _db.Matches
             .SingleOrDefaultAsync(
                 match =>
                     match.Id == matchId,
-                Context.ConnectionAborted);
+                CancellationToken.None);
 
         if (match is null)
         {
-            throw new HubException(
-                "Match was not found.");
+            return;
         }
 
-        match.SharedNote =
-            normalizedText;
+        var hasPendingRequest =
+            match.PauseRequestedByUserId is not null ||
+            match.ResumeRequestedByUserId is not null;
+
+        if (!hasPendingRequest)
+        {
+            return;
+        }
+
+        match.PauseRequestedByUserId = null;
+        match.PauseRequestedAt = null;
+
+        match.ResumeRequestedByUserId = null;
+        match.ResumeRequestedAt = null;
 
         await _db.SaveChangesAsync(
-            Context.ConnectionAborted);
+            CancellationToken.None);
+    }
+
+    private async Task NotifyControlChangedAsync(
+        Guid matchId)
+    {
+        var controllerUserId =
+            _controlRegistry
+                .GetControllerUserId(
+                    matchId);
 
         await Clients
             .Group(GroupName(matchId))
             .SendAsync(
-                "SharedNoteUpdated",
+                "MatchControlChanged",
                 new
                 {
                     matchId,
-                    text = match.SharedNote
+                    controllerUserId
                 },
-                Context.ConnectionAborted);
+                CancellationToken.None);
     }
 
-    public async Task LeaveMatch(Guid matchId)
+    private async Task HandleControlTransferAsync(
+        Guid matchId)
     {
-        var promotedUserId =
-            _viewerRegistry.Leave(
+        await ClearPendingControlRequestsAsync(
+            matchId);
+
+        await NotifyControlChangedAsync(
+            matchId);
+    }
+
+    public async Task LeaveMatch(
+    Guid matchId)
+    {
+        var controlChanged =
+            _controlRegistry.Leave(
                 matchId,
                 Context.ConnectionId);
 
@@ -297,24 +272,26 @@ public sealed class MatchHub : Hub
             GroupName(matchId),
             Context.ConnectionAborted);
 
-        if (promotedUserId is not null)
+        if (controlChanged)
         {
-            await NotifyAccessChangedAsync(
+            await HandleControlTransferAsync(
                 matchId);
         }
     }
 
-    public override async Task OnDisconnectedAsync(Exception? exception)
+    public override async Task OnDisconnectedAsync(
+    Exception? exception)
     {
-        var promotions =
-            _viewerRegistry.RemoveConnection(
-                Context.ConnectionId);
+        var changedMatches =
+            _controlRegistry
+                .RemoveConnection(
+                    Context.ConnectionId);
 
-        foreach (var promotion
-            in promotions)
+        foreach (var matchId
+            in changedMatches)
         {
-            await NotifyAccessChangedAsync(
-                promotion.MatchId);
+            await HandleControlTransferAsync(
+                matchId);
         }
 
         await base.OnDisconnectedAsync(
