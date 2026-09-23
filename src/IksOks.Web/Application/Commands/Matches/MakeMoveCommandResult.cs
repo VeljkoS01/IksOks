@@ -8,7 +8,8 @@ public enum MakeMoveFailure
     OutsideBoard,
     Occupied,
     NotYourTurn,
-    Conflict
+    Conflict,
+    TurnExpired
 }
 
 public sealed record MakeMoveData(

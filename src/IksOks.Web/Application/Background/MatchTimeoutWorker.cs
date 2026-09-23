@@ -6,6 +6,7 @@ using IksOks.Web.Messaging.Contracts;
 using IksOks.Web.Realtime;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using IksOks.Web.Application.Concurrency;
 
 namespace IksOks.Web.Application.Background;
 
@@ -15,15 +16,18 @@ public sealed class MatchTimeoutWorker
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IHubContext<MatchHub> _hub;
     private readonly ILogger<MatchTimeoutWorker> _logger;
+    private readonly MatchOperationLock _matchOperationLock;
 
     public MatchTimeoutWorker(
         IServiceScopeFactory scopeFactory,
         IHubContext<MatchHub> hub,
-        ILogger<MatchTimeoutWorker> logger)
+        ILogger<MatchTimeoutWorker> logger,
+        MatchOperationLock matchOperationLock)
     {
         _scopeFactory = scopeFactory;
         _hub = hub;
         _logger = logger;
+        _matchOperationLock = matchOperationLock;
     }
 
     protected override async Task ExecuteAsync(
@@ -65,21 +69,50 @@ public sealed class MatchTimeoutWorker
                 .GetRequiredService<IksOksDbContext>();
 
         var now =
-            DateTimeOffset.UtcNow;
+    DateTimeOffset.UtcNow;
 
-        var expiredMatches =
+        var expiredMatchIds =
             await db.Matches
-                .Include(match => match.Moves)
+                .AsNoTracking()
                 .Where(match =>
                     match.Status ==
                         MatchStatus.InProgress &&
                     match.TurnDeadlineAt != null &&
                     match.TurnDeadlineAt <= now &&
                     match.OpponentUserId != null)
-                .ToListAsync(cancellationToken);
+                .Select(match => match.Id)
+                .ToListAsync(
+                    cancellationToken);
 
-        foreach (var match in expiredMatches)
+        foreach (var matchId in expiredMatchIds)
         {
+
+            using var operationLock =
+                await _matchOperationLock.AcquireAsync(
+                matchId,
+                cancellationToken);
+
+            var checkTime =
+                DateTimeOffset.UtcNow;
+
+            var match = await db.Matches
+                .Include(match => match.Moves)
+                .SingleOrDefaultAsync(
+                    match =>
+                        match.Id == matchId,
+                    cancellationToken);
+
+            if (
+                match is null ||
+                match.Status !=
+                    MatchStatus.InProgress ||
+                match.TurnDeadlineAt is null ||
+                match.TurnDeadlineAt > checkTime ||
+                match.OpponentUserId is null)
+            {
+                continue;
+            }
+
             var opponentId =
                 match.OpponentUserId!.Value;
 
@@ -100,8 +133,8 @@ public sealed class MatchTimeoutWorker
             match.WinnerUserId =
                 winnerUserId;
 
-            match.FinishedAt =
-                now;
+            match.FinishedAt = 
+                checkTime;
 
             match.TurnDeadlineAt = null;
             match.PausedTurnSecondsRemaining = null;

@@ -594,6 +594,13 @@ public static class MatchEndpoints
                             "It is not your turn."
                     }),
 
+                MakeMoveFailure.TurnExpired =>
+                    Results.Conflict(new
+                    {
+                        error =
+                            "Turn time has expired."
+                    }),
+
                 _ =>
                     Results.Conflict(new
                     {
