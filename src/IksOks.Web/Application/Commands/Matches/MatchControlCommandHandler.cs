@@ -1,7 +1,9 @@
-﻿using IksOks.Web.Domain.States;
+﻿using IksOks.Web.Application.Concurrency;
+using IksOks.Web.Domain.Entities;
+using IksOks.Web.Domain.States;
 using IksOks.Web.Infrastructure.Persistence;
+using IksOks.Web.Realtime.Collaboration;
 using Microsoft.EntityFrameworkCore;
-using IksOks.Web.Application.Concurrency;
 
 namespace IksOks.Web.Application.Commands.Matches;
 
@@ -28,15 +30,18 @@ public sealed class MatchControlCommandHandler
     private readonly IksOksDbContext _db;
     private readonly MatchStateFactory _stateFactory;
     private readonly MatchOperationLock _matchOperationLock;
+    private readonly MatchControlRegistry _controlRegistry;
 
     public MatchControlCommandHandler(
         IksOksDbContext db,
         MatchStateFactory stateFactory,
-        MatchOperationLock matchOperationLock)
+        MatchOperationLock matchOperationLock,
+        MatchControlRegistry controlRegistry)
     {
         _db = db;
         _stateFactory = stateFactory;
         _matchOperationLock = matchOperationLock;
+        _controlRegistry = controlRegistry;
     }
 
     public async Task<MatchControlCommandResult> HandleAsync(
@@ -45,8 +50,8 @@ public sealed class MatchControlCommandHandler
     {
         using var operationLock =
             await _matchOperationLock.AcquireAsync(
-            command.MatchId,
-            cancellationToken);
+                command.MatchId,
+                cancellationToken);
 
         var match = await _db.Matches
             .SingleOrDefaultAsync(
@@ -69,7 +74,9 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.InvalidState);
         }
 
-        if (match.OpponentUserId != command.UserId)
+        if (!CanRequestControl(
+            match,
+            command.UserId))
         {
             return MatchControlCommandResult.Failed(
                 MatchControlFailure.Forbidden);
@@ -98,15 +105,15 @@ public sealed class MatchControlCommandHandler
         PauseMatchCommand command,
         CancellationToken cancellationToken)
     {
-
         using var operationLock =
             await _matchOperationLock.AcquireAsync(
-            command.MatchId,
-            cancellationToken);
+                command.MatchId,
+                cancellationToken);
 
         var match = await _db.Matches
             .SingleOrDefaultAsync(
-                match => match.Id == command.MatchId,
+                match =>
+                    match.Id == command.MatchId,
                 cancellationToken);
 
         if (match is null)
@@ -115,7 +122,9 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.MatchNotFound);
         }
 
-        if (match.OwnerUserId != command.UserId)
+        if (!CanControl(
+            match,
+            command.UserId))
         {
             return MatchControlCommandResult.Failed(
                 MatchControlFailure.Forbidden);
@@ -130,7 +139,10 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.InvalidState);
         }
 
-        if (match.TurnDeadlineAt is not null && match.TurnDeadlineAt <= DateTimeOffset.UtcNow)
+        if (
+            match.TurnDeadlineAt is not null &&
+            match.TurnDeadlineAt <=
+                DateTimeOffset.UtcNow)
         {
             return MatchControlCommandResult.Failed(
                 MatchControlFailure.InvalidState);
@@ -170,11 +182,10 @@ public sealed class MatchControlCommandHandler
         RejectPauseRequestCommand command,
         CancellationToken cancellationToken)
     {
-
         using var operationLock =
             await _matchOperationLock.AcquireAsync(
-            command.MatchId,
-            cancellationToken);
+                command.MatchId,
+                cancellationToken);
 
         var match = await _db.Matches
             .SingleOrDefaultAsync(
@@ -188,7 +199,9 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.MatchNotFound);
         }
 
-        if (match.OwnerUserId != command.UserId)
+        if (!CanControl(
+            match,
+            command.UserId))
         {
             return MatchControlCommandResult.Failed(
                 MatchControlFailure.Forbidden);
@@ -220,18 +233,18 @@ public sealed class MatchControlCommandHandler
     }
 
     public async Task<MatchControlCommandResult> HandleAsync(
-    ResumeMatchCommand command,
-    CancellationToken cancellationToken)
+        ResumeMatchCommand command,
+        CancellationToken cancellationToken)
     {
-
         using var operationLock =
             await _matchOperationLock.AcquireAsync(
-            command.MatchId,
-            cancellationToken);
+                command.MatchId,
+                cancellationToken);
 
         var match = await _db.Matches
             .SingleOrDefaultAsync(
-                match => match.Id == command.MatchId,
+                match =>
+                    match.Id == command.MatchId,
                 cancellationToken);
 
         if (match is null)
@@ -240,7 +253,9 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.MatchNotFound);
         }
 
-        if (match.OwnerUserId != command.UserId)
+        if (!CanControl(
+            match,
+            command.UserId))
         {
             return MatchControlCommandResult.Failed(
                 MatchControlFailure.Forbidden);
@@ -281,18 +296,18 @@ public sealed class MatchControlCommandHandler
     }
 
     public async Task<MatchControlCommandResult> HandleAsync(
-    RequestResumeCommand command,
-    CancellationToken cancellationToken)
+        RequestResumeCommand command,
+        CancellationToken cancellationToken)
     {
-
         using var operationLock =
             await _matchOperationLock.AcquireAsync(
-            command.MatchId,
-            cancellationToken);
+                command.MatchId,
+                cancellationToken);
 
         var match = await _db.Matches
             .SingleOrDefaultAsync(
-                match => match.Id == command.MatchId,
+                match =>
+                    match.Id == command.MatchId,
                 cancellationToken);
 
         if (match is null)
@@ -310,7 +325,9 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.InvalidState);
         }
 
-        if (match.OpponentUserId != command.UserId)
+        if (!CanRequestControl(
+            match,
+            command.UserId))
         {
             return MatchControlCommandResult.Failed(
                 MatchControlFailure.Forbidden);
@@ -336,18 +353,18 @@ public sealed class MatchControlCommandHandler
     }
 
     public async Task<MatchControlCommandResult> HandleAsync(
-    RejectResumeRequestCommand command,
-    CancellationToken cancellationToken)
+        RejectResumeRequestCommand command,
+        CancellationToken cancellationToken)
     {
-
         using var operationLock =
             await _matchOperationLock.AcquireAsync(
-            command.MatchId,
-            cancellationToken);
+                command.MatchId,
+                cancellationToken);
 
         var match = await _db.Matches
             .SingleOrDefaultAsync(
-                match => match.Id == command.MatchId,
+                match =>
+                    match.Id == command.MatchId,
                 cancellationToken);
 
         if (match is null)
@@ -356,7 +373,9 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.MatchNotFound);
         }
 
-        if (match.OwnerUserId != command.UserId)
+        if (!CanControl(
+            match,
+            command.UserId))
         {
             return MatchControlCommandResult.Failed(
                 MatchControlFailure.Forbidden);
@@ -376,5 +395,46 @@ public sealed class MatchControlCommandHandler
             cancellationToken);
 
         return MatchControlCommandResult.Success();
+    }
+
+    private bool CanControl(
+        GameMatch match,
+        Guid userId)
+    {
+        return
+            IsParticipant(match, userId) &&
+            _controlRegistry.CanControl(
+                match.Id,
+                userId);
+    }
+
+    private bool CanRequestControl(
+        GameMatch match,
+        Guid userId)
+    {
+        if (!IsParticipant(
+            match,
+            userId))
+        {
+            return false;
+        }
+
+        var controllerUserId =
+            _controlRegistry
+                .GetControllerUserId(
+                    match.Id);
+
+        return
+            controllerUserId is not null &&
+            controllerUserId != userId;
+    }
+
+    private static bool IsParticipant(
+        GameMatch match,
+        Guid userId)
+    {
+        return
+            match.OwnerUserId == userId ||
+            match.OpponentUserId == userId;
     }
 }

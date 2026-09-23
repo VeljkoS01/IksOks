@@ -2,15 +2,8 @@
   <Folder Name="/src/">
     <Project Path="src/IksOks.Web/IksOks.Web.csproj" />
   </Folder>
+
   <Folder Name="/tests/">
     <Project Path="tests/IksOks.Web.Tests/IksOks.Web.Tests.csproj" />
-  </Folder>
-  <Folder Name="/tests/Application/" />
-  <Folder Name="/tests/Application/Concurrency/">
-    <File Path="MatchOperationLockTests.cs" />
-  </Folder>
-  <Folder Name="/tests/Realtime/" />
-  <Folder Name="/tests/Realtime/Collaboration/">
-    <File Path="MatchViewerRegistryTests.cs" />
   </Folder>
 </Solution>
