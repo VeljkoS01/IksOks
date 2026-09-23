@@ -11,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using IksOks.Web.Application.Commands;
 using IksOks.Web.Application.Commands.Matches;
 using IksOks.Web.Application.Background;
+using IksOks.Web.Realtime.Collaboration;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,6 +49,7 @@ builder.Services
 
 builder.Services.AddAuthorization();
 builder.Services.AddSignalR();
+builder.Services.AddSingleton<MatchViewerRegistry>();
 
 builder.Services.Configure<RabbitMqOptions>(
     builder.Configuration.GetSection(

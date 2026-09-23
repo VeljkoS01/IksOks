@@ -18,11 +18,11 @@ public sealed class GameMatch
 
     public int WinLength { get; set; }
 
-    public MatchStatus Status { get; set; }
-        = MatchStatus.WaitingForOpponent;
+    public MatchStatus Status { get; set; } = MatchStatus.WaitingForOpponent;
 
-    public DateTimeOffset CreatedAt { get; set; }
-        = DateTimeOffset.UtcNow;
+    public string SharedNote { get; set; } = string.Empty;
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public Guid? WinnerUserId { get; set; }
 
@@ -30,13 +30,10 @@ public sealed class GameMatch
 
     public DateTimeOffset? FinishedAt { get; set; }
 
-    public ICollection<MatchMove> Moves { get; set; }
-        = new List<MatchMove>();
-    public MatchMode Mode { get; set; }
-    = MatchMode.Classic;
+    public ICollection<MatchMove> Moves { get; set; } = new List<MatchMove>();
+    public MatchMode Mode { get; set; } = MatchMode.Classic;
 
-    public MatchVisibility Visibility { get; set; }
-    = MatchVisibility.Public;
+    public MatchVisibility Visibility { get; set; } = MatchVisibility.Public;
 
     public string? JoinCode { get; set; }
 

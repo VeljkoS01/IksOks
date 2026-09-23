@@ -682,6 +682,7 @@ public static class MatchEndpoints
             match.WinnerUser?.UserName,
             match.CreatedAt,
             match.FinishedAt,
+            match.SharedNote,
             moves);
     }
 
