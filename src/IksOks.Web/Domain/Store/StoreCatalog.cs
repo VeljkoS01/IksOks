@@ -8,6 +8,7 @@ public static class StoreCatalog
     public static IReadOnlyList<StoreItemDefinition> Items { get; } =
         new List<StoreItemDefinition>
         {
+            // Emoji
             new(
                 "emoji-rocket",
                 "Raketa",
@@ -30,6 +31,49 @@ public static class StoreCatalog
                 20),
 
             new(
+                "emoji-target",
+                "Meta",
+                EmojiType,
+                "🎯",
+                15),
+
+            new(
+                "emoji-lightning",
+                "Munja",
+                EmojiType,
+                "⚡",
+                15),
+
+            new(
+                "emoji-eyes",
+                "Pogled",
+                EmojiType,
+                "👀",
+                15),
+
+            new(
+                "emoji-brain",
+                "Mozak",
+                EmojiType,
+                "🧠",
+                20),
+
+            new(
+                "emoji-trophy",
+                "Trofej",
+                EmojiType,
+                "🏆",
+                25),
+
+            new(
+                "emoji-heart",
+                "Srce",
+                EmojiType,
+                "❤️",
+                20),
+
+            // Borderi
+            new(
                 "border-gold",
                 "Zlatni okvir",
                 BorderType,
@@ -41,7 +85,28 @@ public static class StoreCatalog
                 "Neon okvir",
                 BorderType,
                 "border-neon",
-                30)
+                30),
+
+            new(
+                "border-purple",
+                "Ljubičasti okvir",
+                BorderType,
+                "border-purple",
+                25),
+
+            new(
+                "border-fire",
+                "Vatreni okvir",
+                BorderType,
+                "border-fire",
+                35),
+
+            new(
+                "border-ice",
+                "Ledeni okvir",
+                BorderType,
+                "border-ice",
+                35)
         };
 
     public static StoreItemDefinition? FindByKey(
