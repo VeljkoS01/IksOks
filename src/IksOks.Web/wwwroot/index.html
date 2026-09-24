@@ -84,8 +84,46 @@
             </button>
         </header>
         <section id="lobby-view">
+            <nav class="lobby-nav"
+                 aria-label="Glavna navigacija">
+                <button class="lobby-nav-button active"
+                        data-lobby-target="play"
+                        type="button">
+                    Igraj
+                </button>
+
+                <button class="lobby-nav-button"
+                        data-lobby-target="matches"
+                        type="button">
+                    Moji mečevi
+                </button>
+
+                <button class="lobby-nav-button"
+                        data-lobby-target="live"
+                        type="button">
+                    Uživo
+                </button>
+
+                <button class="lobby-nav-button"
+                        data-lobby-target="ranking"
+                        type="button">
+                    Rang lista
+                </button>
+
+                <button class="lobby-nav-button"
+                        data-lobby-target="store"
+                        type="button">
+                    Prodavnica
+                </button>
+
+                <button class="lobby-nav-button"
+                        data-lobby-target="profile"
+                        type="button">
+                    Profil
+                </button>
+            </nav>
             <div class="dashboard-grid">
-                <section class="dashboard-card">
+                <section class="dashboard-card" data-lobby-page="play">
                     <h2>Napravi meč</h2>
 
                     <form id="create-match-form">
@@ -155,7 +193,7 @@
                     </p>
                 </section>
 
-                <section class="dashboard-card">
+                <section class="dashboard-card" data-lobby-page="play">
                     <div class="matches-header">
                         <h2>Dostupni mečevi</h2>
 
@@ -193,7 +231,7 @@
                 </section>
             </div>
             <div class="personal-matches-grid">
-                <section class="dashboard-card">
+                <section class="dashboard-card" data-lobby-page="matches">
                     <div class="matches-header">
                         <h2>Moji aktivni mečevi</h2>
 
@@ -208,7 +246,7 @@
                          class="matches-list">
                     </div>
                 </section>
-                <section class="dashboard-card">
+                <section class="dashboard-card" data-lobby-page="live">
                     <div class="section-header">
                         <h2>Mečevi uživo</h2>
 
@@ -223,7 +261,7 @@
                          class="matches-list">
                     </div>
                 </section>
-                <section class="dashboard-card">
+                <section class="dashboard-card" data-lobby-page="matches">
                     <h2>Istorija mečeva</h2>
 
                     <div id="match-history-list"
@@ -232,7 +270,7 @@
                 </section>
             </div>
             <div class="profile-leaderboard-grid">
-                <section id="profile-card" class="dashboard-card">
+                <section id="profile-card" class="dashboard-card" data-lobby-page="profile">
                     <div class="matches-header">
                         <h2>Moj profil</h2>
 
@@ -248,7 +286,7 @@
                     </div>
                 </section>
 
-                <section class="dashboard-card">
+                <section class="dashboard-card" data-lobby-page="ranking">
                     <div class="matches-header">
                         <h2>Rang lista</h2>
 
@@ -264,7 +302,7 @@
                     </div>
                 </section>
             </div>
-            <section class="dashboard-card store-card">
+            <section class="dashboard-card store-card" data-lobby-page="store">
                 <div class="matches-header">
                     <div>
                         <h2>Prodavnica</h2>

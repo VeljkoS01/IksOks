@@ -605,3 +605,46 @@ input {
     font-size: 13px;
     font-weight: 700;
 }
+
+.lobby-nav {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+    padding: 8px;
+    overflow-x: auto;
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+}
+
+.lobby-nav-button {
+    flex: 0 0 auto;
+    padding: 10px 16px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #4b5563;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+    .lobby-nav-button:hover {
+        background: #f3f4f6;
+    }
+
+    .lobby-nav-button.active {
+        background: #111827;
+        color: white;
+    }
+
+#lobby-view > .store-card {
+    margin-top: 0;
+}
+
+@media (max-width: 760px) {
+    .lobby-nav {
+        margin-left: -4px;
+        margin-right: -4px;
+    }
+}

@@ -1,4 +1,11 @@
-﻿const loginTab = document.querySelector("#login-tab");
+﻿const lobbyNavButtons =document.querySelectorAll(".lobby-nav-button");
+const lobbyPageCards = document.querySelectorAll("[data-lobby-page]");
+const lobbyGridContainers = [
+    document.querySelector(".dashboard-grid"),
+    document.querySelector(".personal-matches-grid"),
+    document.querySelector(".profile-leaderboard-grid")
+];
+const loginTab = document.querySelector("#login-tab");
 const registerTab = document.querySelector("#register-tab");
 const authForm = document.querySelector("#auth-form");
 const usernameInput = document.querySelector("#username");
@@ -70,6 +77,7 @@ let hubConnection = null;
 let hubStartPromise = null;
 let timerIntervalId = null;
 let currentDeadline = null;
+let activeLobbyPage = "play";
 
 loginTab.addEventListener("click", () => {
     setMode("login");
@@ -235,6 +243,45 @@ function resetMatchView() {
     lobbyView.classList.remove("hidden");
 }
 
+function showLobbyPage(pageName) {
+    activeLobbyPage = pageName;
+
+    for (const button of lobbyNavButtons) {
+        button.classList.toggle(
+            "active",
+            button.dataset.lobbyTarget ===
+            pageName);
+    }
+
+    for (const card of lobbyPageCards) {
+        card.classList.toggle(
+            "hidden",
+            card.dataset.lobbyPage !==
+            pageName);
+    }
+
+    for (const container
+        of lobbyGridContainers) {
+        if (!container) {
+            continue;
+        }
+
+        const cards =
+            container.querySelectorAll(
+                "[data-lobby-page]");
+
+        const hasVisibleCard =
+            Array.from(cards)
+                .some(card =>
+                    !card.classList.contains(
+                        "hidden"));
+
+        container.classList.toggle(
+            "hidden",
+            !hasVisibleCard);
+    }
+}
+
 function showAuthenticatedUser(user) {
     currentUser = user;
 
@@ -242,6 +289,7 @@ function showAuthenticatedUser(user) {
 
     authPage.classList.add("hidden");
     appPage.classList.remove("hidden");
+    showLobbyPage(activeLobbyPage);
 
     welcomeText.textContent =
         `Dobrodošli, ${user.userName}!`;
@@ -261,6 +309,7 @@ function showAuthPage() {
     stopTurnTimer();
     activeMatchId = null;
     currentUser = null;
+    activeLobbyPage = "play";
 
     matchesList.replaceChildren();
     activeMatchesList.replaceChildren();
@@ -1964,6 +2013,15 @@ refreshLeaderboardButton.addEventListener(
 refreshStoreButton.addEventListener(
     "click",
     loadStore);
+
+for (const button of lobbyNavButtons) {
+    button.addEventListener(
+        "click",
+        () => {
+            showLobbyPage(
+                button.dataset.lobbyTarget);
+        });
+}
 
 function updateMatchModeFields() {
     const mode = matchModeInput.value;
