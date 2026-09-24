@@ -49,11 +49,20 @@
                         Lozinka
                     </label>
 
-                    <input id="password"
-                           name="password"
-                           type="password"
-                           autocomplete="current-password"
-                           required>
+                    <div class="password-input-wrapper">
+                        <input id="password"
+                               name="password"
+                               type="password"
+                               autocomplete="current-password"
+                               required>
+
+                        <button id="toggle-password-button"
+                                class="password-toggle-button"
+                                type="button"
+                                aria-pressed="false">
+                            Prikaži
+                        </button>
+                    </div>
                 </div>
 
                 <button id="submit-button"
@@ -148,12 +157,16 @@
                                 Veličina table
                             </label>
 
-                            <input id="board-size"
-                                   type="number"
-                                   min="3"
-                                   max="10"
-                                   value="3"
-                                   required>
+                            <select id="board-size">
+                                <option value="3">3 × 3</option>
+                                <option value="4">4 × 4</option>
+                                <option value="5">5 × 5</option>
+                                <option value="6">6 × 6</option>
+                                <option value="7">7 × 7</option>
+                                <option value="8">8 × 8</option>
+                                <option value="9">9 × 9</option>
+                                <option value="10">10 × 10</option>
+                            </select>
                         </div>
 
                         <div class="form-field">
@@ -161,26 +174,31 @@
                                 Polja za pobedu
                             </label>
 
-                            <input id="win-length"
-                                   type="number"
-                                   min="3"
-                                   max="3"
-                                   value="3"
-                                   required>
+                            <select id="win-length">
+                                <option value="3">3</option>
+                            </select>
                         </div>
-                        <label for="match-visibility">
-                            Vidljivost meča
-                        </label>
+                        <div class="form-field visibility-field">
+                            <span class="field-label">
+                                Vidljivost meča
+                            </span>
 
-                        <select id="match-visibility">
-                            <option value="Public">
-                                Javan
-                            </option>
+                            <label class="visibility-switch">
+                                <span class="visibility-label">
+                                    Javan
+                                </span>
 
-                            <option value="Private">
-                                Privatan
-                            </option>
-                        </select>
+                                <input id="match-visibility"
+                                       type="checkbox"
+                                       role="switch">
+
+                                <span class="visibility-slider"></span>
+
+                                <span class="visibility-label">
+                                    Privatan
+                                </span>
+                            </label>
+                        </div>
                         <button class="primary-button"
                                 type="submit">
                             Napravi meč
@@ -312,16 +330,19 @@
                         </p>
                     </div>
 
-                    <button id="refresh-store-button"
-                            class="secondary-button"
-                            type="button">
-                        Osveži
-                    </button>
-                    <button id="clear-border-button"
-                            class="secondary-button"
-                            type="button">
-                        Bez okvira
-                    </button>
+                    <div class="store-header-actions">
+                        <button id="refresh-store-button"
+                                class="secondary-button"
+                                type="button">
+                            Osveži
+                        </button>
+
+                        <button id="clear-border-button"
+                                class="secondary-button"
+                                type="button">
+                            Bez okvira
+                        </button>
+                    </div>
                 </div>
 
                 <div id="store-list"
@@ -365,13 +386,49 @@
                 </div>
 
                 <aside class="match-side-panel">
-                    <div id="player-badge"
-                         class="match-symbol">
-                        Tvoj znak:
-                        <strong id="player-symbol">
-                            -
-                        </strong>
-                    </div>
+                    <section class="players-panel">
+                        <div class="players-panel-header">
+                            Igrači
+                        </div>
+
+                        <div id="owner-player-card"
+                             class="player-card">
+                            <div class="player-card-info">
+                                <strong id="owner-player-name">
+                                    -
+                                </strong>
+
+                                <span id="owner-player-you"
+                                      class="player-you-badge hidden">
+                                    Vi
+                                </span>
+                            </div>
+
+                            <strong id="owner-player-symbol"
+                                    class="player-card-symbol">
+                                X
+                            </strong>
+                        </div>
+
+                        <div id="opponent-player-card"
+                             class="player-card">
+                            <div class="player-card-info">
+                                <strong id="opponent-player-name">
+                                    Čeka se protivnik
+                                </strong>
+
+                                <span id="opponent-player-you"
+                                      class="player-you-badge hidden">
+                                    Vi
+                                </span>
+                            </div>
+
+                            <strong id="opponent-player-symbol"
+                                    class="player-card-symbol">
+                                O
+                            </strong>
+                        </div>
+                    </section>
 
                     <p id="game-message"
                        class="message match-game-message"
@@ -405,6 +462,70 @@
                 </aside>
             </div>
         </section>
+        <dialog id="match-finished-dialog" class="app-dialog match-finished-dialog">
+
+            <button id="match-finished-close-button"
+                    class="dialog-close-button"
+                    type="button"
+                    aria-label="Zatvori">
+                ×
+            </button>
+
+            <div class="match-finished-icon">
+                🏆
+            </div>
+
+            <h2 id="match-finished-title">
+                Meč je završen
+            </h2>
+
+            <p id="match-finished-message">
+            </p>
+
+            <button id="match-finished-lobby-button"
+                    class="primary-button"
+                    type="button">
+                Nazad u lobby
+            </button>
+        </dialog>
+        <dialog id="confirmation-dialog"
+                class="app-dialog confirmation-dialog">
+
+            <button id="confirmation-close-button"
+                    class="dialog-close-button"
+                    type="button"
+                    aria-label="Zatvori">
+                ×
+            </button>
+
+            <div class="confirmation-icon">
+                !
+            </div>
+
+            <h2 id="confirmation-title">
+                Potvrda
+            </h2>
+
+            <p id="confirmation-message">
+            </p>
+
+            <form method="dialog"
+                  class="confirmation-actions">
+
+                <button class="secondary-button"
+                        type="submit"
+                        value="cancel">
+                    Otkaži
+                </button>
+
+                <button id="confirmation-confirm-button"
+                        class="secondary-button danger-button"
+                        type="submit"
+                        value="confirm">
+                    Potvrdi
+                </button>
+            </form>
+        </dialog>
     </main>
 
     <script src="/lib/signalr/signalr.min.js"></script>

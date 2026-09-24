@@ -10,6 +10,10 @@ using IksOks.Web.Domain.Strategies;
 using IksOks.Web.Domain.States;
 using IksOks.Web.Application.Commands;
 using IksOks.Web.Application.Commands.Matches;
+using System.Text.Json;
+using IksOks.Web.Application.Concurrency;
+using IksOks.Web.Infrastructure.Persistence.Entities;
+using IksOks.Web.Messaging.Contracts;
 
 namespace IksOks.Web.Endpoints;
 
@@ -23,20 +27,22 @@ public static class MatchEndpoints
             .RequireAuthorization();
 
         group.MapPost("/", CreateMatchAsync);
-        group.MapGet("/", GetMatchesAsync);
         group.MapPost("/{matchId:guid}/join", JoinMatchAsync);
         group.MapPost("/join-private",JoinPrivateMatchAsync);
-        group.MapGet("/{matchId:guid}", GetMatchAsync);
-        group.MapPost("/{matchId:guid}/moves",MakeMoveAsync);
-        group.MapGet("/mine/active",GetMyActiveMatchesAsync);
-        group.MapGet("/mine/history",GetMyMatchHistoryAsync);
-        group.MapGet("/live", GetLiveMatchesAsync);
-        group.MapPost("/{matchId:guid}/pause-request",RequestPauseAsync);
-        group.MapPost("/{matchId:guid}/pause",PauseMatchAsync);
-        group.MapPost("/{matchId:guid}/pause-request/reject",RejectPauseRequestAsync);
-        group.MapPost("/{matchId:guid}/resume",ResumeMatchAsync);
+        group.MapPost("/{matchId:guid}/moves", MakeMoveAsync);
+        group.MapPost("/{matchId:guid}/pause-request", RequestPauseAsync);
+        group.MapPost("/{matchId:guid}/pause", PauseMatchAsync);
+        group.MapPost("/{matchId:guid}/pause-request/reject", RejectPauseRequestAsync);
+        group.MapPost("/{matchId:guid}/resume", ResumeMatchAsync);
         group.MapPost("/{matchId:guid}/resume-request", RequestResumeAsync);
         group.MapPost("/{matchId:guid}/resume-request/reject", RejectResumeRequestAsync);
+        group.MapPost("/{matchId:guid}/surrender", SurrenderMatchAsync);
+        group.MapPost("/{matchId:guid}/cancel", CancelWaitingMatchAsync);
+        group.MapGet("/", GetMatchesAsync);
+        group.MapGet("/{matchId:guid}", GetMatchAsync);
+        group.MapGet("/mine/active", GetMyActiveMatchesAsync);
+        group.MapGet("/mine/history", GetMyMatchHistoryAsync);
+        group.MapGet("/live", GetLiveMatchesAsync);
 
         return endpoints;
     }
@@ -517,6 +523,230 @@ public static class MatchEndpoints
         }
 
         return Results.Ok(ToDetailsResponse(match));
+    }
+
+    private static async Task<IResult> SurrenderMatchAsync(
+    Guid matchId,
+    ClaimsPrincipal principal,
+    IksOksDbContext db,
+    MatchOperationLock matchOperationLock,
+    IHubContext<MatchHub> hub,
+    CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        using var operationLock =
+            await matchOperationLock.AcquireAsync(
+                matchId,
+                cancellationToken);
+
+        var match = await db.Matches
+            .SingleOrDefaultAsync(
+                match => match.Id == matchId,
+                cancellationToken);
+
+        if (match is null)
+        {
+            return Results.NotFound(new
+            {
+                error = "Match was not found."
+            });
+        }
+
+        if (
+            match.Status != MatchStatus.InProgress &&
+            match.Status != MatchStatus.Paused)
+        {
+            return Results.Conflict(new
+            {
+                error =
+                    "Only an active match can be surrendered."
+            });
+        }
+
+        if (match.OpponentUserId is null)
+        {
+            return Results.Conflict(new
+            {
+                error =
+                    "The match does not have an opponent."
+            });
+        }
+
+        var isOwner =
+            match.OwnerUserId == userId;
+
+        var isOpponent =
+            match.OpponentUserId == userId;
+
+        if (!isOwner && !isOpponent)
+        {
+            return Results.Forbid();
+        }
+
+        var opponentUserId =
+            match.OpponentUserId.Value;
+
+        var winnerUserId =
+            isOwner
+                ? opponentUserId
+                : match.OwnerUserId;
+
+        var finishedAt =
+            DateTimeOffset.UtcNow;
+
+        match.Status =
+            MatchStatus.Finished;
+
+        match.WinnerUserId =
+            winnerUserId;
+
+        match.FinishedAt =
+            finishedAt;
+
+        match.TurnDeadlineAt = null;
+
+        match.PausedTurnSecondsRemaining =
+            null;
+
+        match.PauseRequestedByUserId = null;
+        match.PauseRequestedAt = null;
+
+        match.ResumeRequestedByUserId = null;
+        match.ResumeRequestedAt = null;
+
+        var eventId =
+            Guid.NewGuid();
+
+        var finishedEvent =
+            new MatchFinishedEvent(
+                eventId,
+                match.Id,
+                match.OwnerUserId,
+                opponentUserId,
+                winnerUserId,
+                false,
+                match.BoardSize,
+                match.WinLength,
+                finishedAt);
+
+        db.OutboxMessages.Add(
+            new OutboxMessage
+            {
+                Id = eventId,
+                RoutingKey =
+                    "match.finished",
+                Payload =
+                    JsonSerializer.Serialize(
+                        finishedEvent),
+                OccurredAt =
+                    finishedAt
+            });
+
+        await db.SaveChangesAsync(
+            cancellationToken);
+
+        await hub.Clients
+            .Group(
+                MatchHub.GroupName(
+                    match.Id))
+            .SendAsync(
+                "MatchUpdated",
+                match.Id,
+                cancellationToken);
+
+        await hub.Clients.All
+            .SendAsync(
+                "LobbyUpdated",
+                cancellationToken);
+
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult>
+    CancelWaitingMatchAsync(
+        Guid matchId,
+        ClaimsPrincipal principal,
+        IksOksDbContext db,
+        IHubContext<MatchHub> hub,
+        CancellationToken cancellationToken)
+    {
+        var userIdValue = principal
+            .FindFirst(ClaimTypes.NameIdentifier)?
+            .Value;
+
+        if (!Guid.TryParse(
+            userIdValue,
+            out var userId))
+        {
+            return Results.Unauthorized();
+        }
+
+        var match = await db.Matches
+            .AsNoTracking()
+            .SingleOrDefaultAsync(
+                match => match.Id == matchId,
+                cancellationToken);
+
+        if (match is null)
+        {
+            return Results.NotFound(new
+            {
+                error = "Match was not found."
+            });
+        }
+
+        if (match.OwnerUserId != userId)
+        {
+            return Results.Forbid();
+        }
+
+        if (
+            match.Status !=
+                MatchStatus.WaitingForOpponent ||
+            match.OpponentUserId is not null)
+        {
+            return Results.Conflict(new
+            {
+                error =
+                    "The match is no longer waiting for an opponent."
+            });
+        }
+
+        var deletedRows =
+            await db.Matches
+                .Where(current =>
+                    current.Id == matchId &&
+                    current.OwnerUserId == userId &&
+                    current.Status ==
+                        MatchStatus.WaitingForOpponent &&
+                    current.OpponentUserId == null)
+                .ExecuteDeleteAsync(
+                    cancellationToken);
+
+        if (deletedRows == 0)
+        {
+            return Results.Conflict(new
+            {
+                error =
+                    "The match is no longer available for cancellation."
+            });
+        }
+
+        await hub.Clients.All.SendAsync(
+            "LobbyUpdated",
+            cancellationToken);
+
+        return Results.NoContent();
     }
 
     private static async Task<IResult> MakeMoveAsync(
