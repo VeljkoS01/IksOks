@@ -10,6 +10,7 @@ const registerTab = document.querySelector("#register-tab");
 const authForm = document.querySelector("#auth-form");
 const usernameInput = document.querySelector("#username");
 const passwordInput = document.querySelector("#password");
+const togglePasswordButton = document.querySelector("#toggle-password-button");
 const submitButton = document.querySelector("#submit-button");
 const message = document.querySelector("#message");
 const authPage = document.querySelector("#auth-page");
@@ -33,7 +34,14 @@ const lobbyView = document.querySelector("#lobby-view");
 const matchView = document.querySelector("#match-view");
 const matchTitle = document.querySelector("#match-title");
 const matchStatus = document.querySelector("#match-status");
-const playerSymbol = document.querySelector("#player-symbol");
+const ownerPlayerCard = document.querySelector("#owner-player-card");
+const ownerPlayerName = document.querySelector("#owner-player-name");
+const ownerPlayerSymbol = document.querySelector("#owner-player-symbol");
+const ownerPlayerYou = document.querySelector("#owner-player-you");
+const opponentPlayerCard = document.querySelector("#opponent-player-card");
+const opponentPlayerName = document.querySelector("#opponent-player-name");
+const opponentPlayerSymbol = document.querySelector("#opponent-player-symbol");
+const opponentPlayerYou = document.querySelector("#opponent-player-you");
 const gameBoard = document.querySelector("#game-board");
 const gameMessage = document.querySelector("#game-message");
 const backToLobbyButton = document.querySelector("#back-to-lobby-button");
@@ -49,13 +57,22 @@ const joinPrivateMatchButton = document.querySelector("#join-private-match-butto
 const privateMatchMessage = document.querySelector("#private-match-message");
 const matchJoinCode = document.querySelector("#match-join-code");
 const profileCard = document.querySelector("#profile-card");
-const playerBadge = document.querySelector("#player-badge");
 const matchControls = document.querySelector("#match-controls");
 const turnTimer = document.querySelector("#turn-timer");
 const matchControlRole = document.querySelector("#match-control-role");
+const matchFinishedDialog = document.querySelector("#match-finished-dialog");
+const matchFinishedCloseButton = document.querySelector("#match-finished-close-button");
+const matchFinishedTitle = document.querySelector("#match-finished-title");
+const matchFinishedMessage = document.querySelector("#match-finished-message");
+const matchFinishedLobbyButton = document.querySelector("#match-finished-lobby-button");
 const emojiChatMessages = document.querySelector("#emoji-chat-messages");
 const emojiChatActions = document.querySelector("#emoji-chat-actions");
 const clearBorderButton = document.querySelector("#clear-border-button");
+const confirmationDialog = document.querySelector("#confirmation-dialog");
+const confirmationCloseButton = document.querySelector("#confirmation-close-button");
+const confirmationTitle = document.querySelector("#confirmation-title");
+const confirmationMessage = document.querySelector("#confirmation-message");
+const confirmationConfirmButton = document.querySelector("#confirmation-confirm-button");
 const basicEmojis = [
     "😀",
     "😂",
@@ -65,6 +82,13 @@ const basicEmojis = [
     "🤔",
     "😢",
     "😡"
+];
+const borderClassNames = [
+    "border-gold",
+    "border-neon",
+    "border-purple",
+    "border-fire",
+    "border-ice"
 ];
 
 let availableEmojis =
@@ -78,6 +102,9 @@ let hubStartPromise = null;
 let timerIntervalId = null;
 let currentDeadline = null;
 let activeLobbyPage = "play";
+let canControlMatch = false;
+let previousMatchStatus = null;
+let finishDialogShownForMatchId = null;
 
 loginTab.addEventListener("click", () => {
     setMode("login");
@@ -87,8 +114,40 @@ registerTab.addEventListener("click", () => {
     setMode("register");
 });
 
+togglePasswordButton.addEventListener(
+    "click",
+    () => {
+        const shouldShow =
+            passwordInput.type === "password";
+
+        passwordInput.type =
+            shouldShow
+                ? "text"
+                : "password";
+
+        togglePasswordButton.textContent =
+            shouldShow
+                ? "Sakrij"
+                : "Prikaži";
+
+        togglePasswordButton.setAttribute(
+            "aria-pressed",
+            shouldShow
+                ? "true"
+                : "false");
+    });
+
 function setMode(newMode) {
     mode = newMode;
+
+    passwordInput.type = "password";
+
+    togglePasswordButton.textContent =
+        "Prikaži";
+
+    togglePasswordButton.setAttribute(
+        "aria-pressed",
+        "false");
 
     const isLogin = mode === "login";
 
@@ -224,6 +283,15 @@ async function checkCurrentUser() {
 function resetMatchView() {
     stopTurnTimer();
 
+    previousMatchStatus = null;
+    finishDialogShownForMatchId = null;
+
+    if (matchFinishedDialog.open) {
+        matchFinishedDialog.close();
+    }
+
+    appPage.classList.remove("match-open");
+
     activeMatchId = null;
 
     turnTimer.textContent = "";
@@ -235,7 +303,6 @@ function resetMatchView() {
 
     matchTitle.textContent = "";
     matchStatus.textContent = "";
-    playerSymbol.textContent = "";
     gameMessage.textContent = "";
     canControlMatch = false;
     matchControlRole.textContent = "";
@@ -246,39 +313,52 @@ function resetMatchView() {
 function showLobbyPage(pageName) {
     activeLobbyPage = pageName;
 
-    for (const button of lobbyNavButtons) {
+    for (
+        const button
+        of lobbyNavButtons
+    ) {
         button.classList.toggle(
             "active",
             button.dataset.lobbyTarget ===
             pageName);
     }
 
-    for (const card of lobbyPageCards) {
+    for (
+        const card
+        of lobbyPageCards
+    ) {
         card.classList.toggle(
             "hidden",
             card.dataset.lobbyPage !==
             pageName);
     }
 
-    for (const container
-        of lobbyGridContainers) {
+    for (
+        const container
+        of lobbyGridContainers
+    ) {
         if (!container) {
             continue;
         }
 
         const cards =
-            container.querySelectorAll(
-                "[data-lobby-page]");
+            Array.from(
+                container.querySelectorAll(
+                    "[data-lobby-page]"));
 
-        const hasVisibleCard =
-            Array.from(cards)
-                .some(card =>
+        const visibleCards =
+            cards.filter(
+                card =>
                     !card.classList.contains(
                         "hidden"));
 
         container.classList.toggle(
             "hidden",
-            !hasVisibleCard);
+            visibleCards.length === 0);
+
+        container.classList.toggle(
+            "single-card-grid",
+            visibleCards.length === 1);
     }
 }
 
@@ -348,23 +428,15 @@ logoutButton.addEventListener("click", async () => {
     showAuthPage();
 });
 
-boardSizeInput.addEventListener("input", () => {
-    const boardSize = Number(boardSizeInput.value);
-
-    winLengthInput.max = String(boardSize);
-
-    if (Number(winLengthInput.value) > boardSize) {
-        winLengthInput.value = String(boardSize);
-    }
-});
-
 createMatchForm.addEventListener(
     "submit",
     async (event) => {
         event.preventDefault();
 
         const mode = matchModeInput.value;
-        const visibility = matchVisibilityInput.value;
+        const visibility = matchVisibilityInput.checked
+                ? "Private"
+                : "Public";
         const boardSize = Number(boardSizeInput.value);
         const winLength = Number(winLengthInput.value);
 
@@ -569,6 +641,14 @@ function showMatchMessage(text, type) {
 }
 
 async function openMatch(matchId) {
+    appPage.classList.add("match-open");
+
+    previousMatchStatus = null;
+    finishDialogShownForMatchId = null;
+
+    if (matchFinishedDialog.open) {
+        matchFinishedDialog.close();
+    }
 
     emojiChatMessages.replaceChildren();
     emojiChatActions.replaceChildren();
@@ -612,32 +692,26 @@ async function loadActiveMatch() {
 }
 
 function renderMatch(match) {
-    const isOwner =
-        currentUser.id === match.ownerUserId;
+    const previousStatus =
+        previousMatchStatus;
 
-    const isOpponent =
-        currentUser.id === match.opponentUserId;
-
-    const mySymbol = isOwner
-        ? "X"
-        : isOpponent
-            ? "O"
-            : "Gledalac";
-
-    playerSymbol.textContent = mySymbol;
-
-    const opponentName = isOwner
-        ? match.opponentUserName
-        : match.ownerUserName;
+    previousMatchStatus =
+        match.status;
 
     const modeText =
         match.mode === "Classic"
             ? "Classic"
             : "Connect-K";
 
-    matchTitle.textContent = opponentName
-        ? `${modeText} protiv ${opponentName}`
-        : `${modeText} · čekanje protivnika`;
+    if (match.opponentUserName) {
+        matchTitle.textContent =
+            `${modeText} · ` +
+            `${match.ownerUserName} protiv ` +
+            `${match.opponentUserName}`;
+    } else {
+        matchTitle.textContent =
+            `${modeText} · čekanje protivnika`;
+    }
 
     if (
         match.visibility === "Private" &&
@@ -655,6 +729,7 @@ function renderMatch(match) {
             "hidden");
     }
 
+    renderPlayerCards(match);
     renderBoard(match);
 
     updateMatchStatus(match);
@@ -662,20 +737,146 @@ function renderMatch(match) {
 
     renderMatchControls(match);
     renderEmojiChatControls(match);
+
+    if (
+        match.status === "Finished" &&
+        previousStatus !== null &&
+        previousStatus !== "Finished"
+    ) {
+        showMatchFinishedDialog(
+            match);
+    }
+}
+
+function showMatchFinishedDialog(
+    match) {
+    const matchId =
+        String(match.id)
+            .toLowerCase();
+
+    if (
+        finishDialogShownForMatchId ===
+        matchId
+    ) {
+        return;
+    }
+
+    finishDialogShownForMatchId =
+        matchId;
+
+    matchFinishedTitle.textContent =
+        "Meč je završen";
+
+    if (match.winnerUserId === null) {
+        matchFinishedMessage.textContent =
+            "Partija je završena nerešeno.";
+    } else {
+        const winnerName =
+            match.winnerUserName ??
+            "Igrač";
+
+        matchFinishedMessage.textContent =
+            `${winnerName} je pobedio!`;
+    }
+
+    if (!matchFinishedDialog.open) {
+        matchFinishedDialog.showModal();
+    }
+}
+
+function renderPlayerCards(match) {
+    setPlayerCard(
+        ownerPlayerCard,
+        ownerPlayerName,
+        ownerPlayerSymbol,
+        ownerPlayerYou,
+        match.ownerUserId,
+        match.ownerUserName,
+        "X",
+        match.ownerActiveBorderKey);
+
+    setPlayerCard(
+        opponentPlayerCard,
+        opponentPlayerName,
+        opponentPlayerSymbol,
+        opponentPlayerYou,
+        match.opponentUserId,
+        match.opponentUserName ??
+        "Čeka se protivnik",
+        "O",
+        match.opponentActiveBorderKey);
+}
+
+function setPlayerCard(
+    card,
+    nameElement,
+    symbolElement,
+    youElement,
+    userId,
+    userName,
+    symbol,
+    borderKey) {
+    for (
+        const className
+        of borderClassNames
+    ) {
+        card.classList.remove(
+            className);
+    }
+
+    card.classList.toggle(
+        "player-card-empty",
+        !userId);
+
+    nameElement.textContent =
+        userName;
+
+    symbolElement.textContent =
+        userId
+            ? symbol
+            : "-";
+
+    const isCurrentUser =
+        userId &&
+        currentUser &&
+        userId === currentUser.id;
+
+    youElement.classList.toggle(
+        "hidden",
+        !isCurrentUser);
+
+    if (
+        borderKey &&
+        borderClassNames.includes(
+            borderKey)
+    ) {
+        card.classList.add(
+            borderKey);
+    }
 }
 
 function renderBoard(match) {
     gameBoard.replaceChildren();
 
     gameBoard.style.gridTemplateColumns =
-        `repeat(${match.boardSize}, minmax(0, 1fr))`;
+        `repeat(
+        ${match.boardSize},
+        minmax(0, 1fr)
+    )`;
 
     gameBoard.style.gridTemplateRows =
-        `repeat(${match.boardSize}, minmax(0, 1fr))`;
+        `repeat(
+        ${match.boardSize},
+        minmax(0, 1fr)
+    )`;
 
     gameBoard.classList.toggle(
         "compact-board",
-        match.boardSize >= 7);
+        match.boardSize >= 6);
+
+    gameBoard.classList.toggle(
+        "dense-board",
+        match.boardSize >= 9);
 
     const movesByPosition = new Map();
 
@@ -858,6 +1059,15 @@ backToLobbyButton.addEventListener(
     });
 
 async function closeMatch() {
+    appPage.classList.remove("match-open");
+
+    previousMatchStatus = null;
+    finishDialogShownForMatchId = null;
+
+    if (matchFinishedDialog.open) {
+        matchFinishedDialog.close();
+    }
+
     stopTurnTimer();
     const matchId = activeMatchId;
 
@@ -1218,98 +1428,207 @@ function renderStore(store) {
 
     storeList.replaceChildren();
 
-    for (const item of store.items) {
-        const card =
-            document.createElement("article");
+    const emojiItems =
+        store.items.filter(
+            item =>
+                item.type === "Emoji");
 
-        card.className = "store-item";
+    const borderItems =
+        store.items.filter(
+            item =>
+                item.type === "Border");
 
-        if (item.isOwned) {
-            card.classList.add(
-                "store-item-owned");
-        }
+    storeList.append(
+        createStoreSection(
+            "Emoji",
+            "Proširi kolekciju reakcija za mečeve.",
+            emojiItems),
+        createStoreSection(
+            "Okviri",
+            "Izaberi izgled svog profila i kartice igrača.",
+            borderItems));
+}
 
-        const preview =
-            document.createElement("div");
+function createStoreSection(
+    title,
+    description,
+    items) {
+    const section =
+        document.createElement("section");
 
-        preview.className =
-            "store-item-preview";
+    section.className =
+        "store-section";
 
-        if (item.type === "Emoji") {
-            preview.textContent =
-                item.value;
-        } else {
-            preview.textContent = "XO";
+    const header =
+        document.createElement("div");
 
-            preview.classList.add(
-                "border-preview",
-                item.value);
-        }
+    header.className =
+        "store-section-header";
 
-        const name =
-            document.createElement("div");
+    const heading =
+        document.createElement("h3");
 
-        name.className =
-            "store-item-name";
+    heading.textContent = title;
 
-        name.textContent =
-            item.name;
+    const text =
+        document.createElement("p");
 
-        const details =
-            document.createElement("div");
+    text.textContent =
+        description;
 
-        details.className =
-            "store-item-details";
+    header.append(
+        heading,
+        text);
 
-        details.textContent =
-            `${item.type} · ${item.price} tokena`;
+    const grid =
+        document.createElement("div");
 
-        const button =
-            document.createElement("button");
+    grid.className =
+        "store-items-grid";
 
-        button.type = "button";
-        button.className =
-            "secondary-button";
-
-        if (!item.isOwned) {
-            button.textContent = "Kupi";
-
-            button.addEventListener(
-                "click",
-                async () => {
-                    await purchaseStoreItem(
-                        item.key);
-                });
-        } else if (
-            item.type === "Border" &&
-            item.isActive
-        ) {
-            button.textContent = "Aktivan";
-            button.disabled = true;
-        } else if (
-            item.type === "Border"
-        ) {
-            button.textContent = "Aktiviraj";
-
-            button.addEventListener(
-                "click",
-                async () => {
-                    await activateBorder(
-                        item.key);
-                });
-        } else {
-            button.textContent = "Kupljeno";
-            button.disabled = true;
-        }
-
-        card.append(
-            preview,
-            name,
-            details,
-            button);
-
-        storeList.append(card);
+    for (const item of items) {
+        grid.append(
+            createStoreItemCard(item));
     }
+
+    section.append(
+        header,
+        grid);
+
+    return section;
+}
+
+function createStoreItemCard(item) {
+    const card =
+        document.createElement("article");
+
+    card.className =
+        "store-item";
+
+    if (item.isOwned) {
+        card.classList.add(
+            "store-item-owned");
+    }
+
+    if (item.isActive) {
+        card.classList.add(
+            "store-item-active");
+    }
+
+    const top =
+        document.createElement("div");
+
+    top.className =
+        "store-item-top";
+
+    const preview =
+        document.createElement("div");
+
+    preview.className =
+        "store-item-preview";
+
+    if (item.type === "Emoji") {
+        preview.textContent =
+            item.value;
+    } else {
+        preview.textContent =
+            "XO";
+
+        preview.classList.add(
+            "border-preview",
+            item.value);
+    }
+
+    const status =
+        document.createElement("span");
+
+    status.className =
+        "store-item-status";
+
+    if (item.isActive) {
+        status.textContent =
+            "✓ Aktivan";
+
+        status.classList.add(
+            "active");
+    } else if (item.isOwned) {
+        status.textContent =
+            "✓ Kupljeno";
+    }
+
+    top.append(
+        preview,
+        status);
+
+    const name =
+        document.createElement("div");
+
+    name.className =
+        "store-item-name";
+
+    name.textContent =
+        item.name;
+
+    const details =
+        document.createElement("div");
+
+    details.className =
+        "store-item-details";
+
+    details.textContent =
+        `${item.price} tokena`;
+
+    const button =
+        document.createElement("button");
+
+    button.type = "button";
+    button.className =
+        "secondary-button store-action-button";
+
+    if (!item.isOwned) {
+        button.textContent =
+            "Kupi";
+
+        button.addEventListener(
+            "click",
+            async () => {
+                await purchaseStoreItem(
+                    item.key);
+            });
+    } else if (
+        item.type === "Border" &&
+        item.isActive
+    ) {
+        button.textContent =
+            "Aktivan";
+
+        button.disabled = true;
+    } else if (
+        item.type === "Border"
+    ) {
+        button.textContent =
+            "Aktiviraj";
+
+        button.addEventListener(
+            "click",
+            async () => {
+                await activateBorder(
+                    item.key);
+            });
+    } else {
+        button.textContent =
+            "Kupljeno";
+
+        button.disabled = true;
+    }
+
+    card.append(
+        top,
+        name,
+        details,
+        button);
+
+    return card;
 }
 
 async function purchaseStoreItem(
@@ -1368,27 +1687,23 @@ async function activateBorder(
 
 function applyActiveBorder(
     activeBorderKey) {
-    const borderClasses = [
-        "border-gold",
-        "border-neon"
-    ];
-
-    for (const className of borderClasses) {
+    for (
+        const className
+        of borderClassNames
+    ) {
         profileCard.classList.remove(
-            className);
-
-        playerBadge.classList.remove(
             className);
     }
 
-    if (!activeBorderKey) {
+    if (
+        !activeBorderKey ||
+        !borderClassNames.includes(
+            activeBorderKey)
+    ) {
         return;
     }
 
     profileCard.classList.add(
-        activeBorderKey);
-
-    playerBadge.classList.add(
         activeBorderKey);
 }
 
@@ -2030,18 +2345,54 @@ for (const button of lobbyNavButtons) {
         });
 }
 
+function populateWinLengthOptions() {
+    const boardSize =
+        Number(boardSizeInput.value);
+
+    const previousValue =
+        Number(winLengthInput.value) || 3;
+
+    winLengthInput.replaceChildren();
+
+    for (
+        let value = 3;
+        value <= boardSize;
+        value++
+    ) {
+        const option =
+            document.createElement("option");
+
+        option.value =
+            String(value);
+
+        option.textContent =
+            String(value);
+
+        winLengthInput.append(option);
+    }
+
+    const selectedValue =
+        Math.min(
+            Math.max(
+                previousValue,
+                3),
+            boardSize);
+
+    winLengthInput.value =
+        String(selectedValue);
+}
+
 function updateMatchModeFields() {
-    const mode = matchModeInput.value;
+    const mode =
+        matchModeInput.value;
 
     if (mode === "Classic") {
         boardSizeInput.value = "3";
-        boardSizeInput.min = "3";
-        boardSizeInput.max = "3";
         boardSizeInput.disabled = true;
 
+        populateWinLengthOptions();
+
         winLengthInput.value = "3";
-        winLengthInput.min = "3";
-        winLengthInput.max = "3";
         winLengthInput.disabled = true;
 
         return;
@@ -2050,29 +2401,23 @@ function updateMatchModeFields() {
     boardSizeInput.disabled = false;
     winLengthInput.disabled = false;
 
-    boardSizeInput.min = "3";
-    boardSizeInput.max = "10";
-
-    if (Number(boardSizeInput.value) < 3) {
+    if (
+        Number(boardSizeInput.value) < 3 ||
+        Number(boardSizeInput.value) > 10
+    ) {
         boardSizeInput.value = "3";
     }
 
-    winLengthInput.min = "3";
-    winLengthInput.max =
-        boardSizeInput.value;
-
-    if (
-        Number(winLengthInput.value) >
-        Number(boardSizeInput.value)
-    ) {
-        winLengthInput.value =
-            boardSizeInput.value;
-    }
+    populateWinLengthOptions();
 }
 
 matchModeInput.addEventListener(
     "change",
     updateMatchModeFields);
+
+boardSizeInput.addEventListener(
+    "change",
+    populateWinLengthOptions);
 
 clearBorderButton.addEventListener(
     "click",
@@ -2086,6 +2431,27 @@ clearBorderButton.addEventListener(
         if (response.ok) {
             await loadStore();
         }
+    });
+
+matchFinishedCloseButton.addEventListener(
+    "click",
+    () => {
+        matchFinishedDialog.close();
+    });
+
+matchFinishedLobbyButton.addEventListener(
+    "click",
+    async () => {
+        matchFinishedDialog.close();
+
+        await closeMatch();
+    });
+
+confirmationCloseButton.addEventListener(
+    "click",
+    () => {
+        confirmationDialog.close(
+            "cancel");
     });
 
 updateMatchModeFields();
@@ -2224,8 +2590,29 @@ function renderMatchControls(match) {
         return;
     }
 
+    if (
+        match.status ===
+        "WaitingForOpponent"
+    ) {
+        matchControlRole.textContent =
+            "Čekate da se protivnik pridruži.";
+
+        if (
+            match.ownerUserId ===
+            currentUser.id
+        ) {
+            matchControls.append(
+                createDangerControlButton(
+                    "Odustani od čekanja",
+                    cancelWaitingMatch));
+        }
+
+        return;
+    }
+
     if (match.status === "Finished") {
         matchControlRole.textContent = "";
+
         return;
     }
 
@@ -2243,6 +2630,11 @@ function renderMatchControls(match) {
                 match);
         }
 
+        matchControls.append(
+            createDangerControlButton(
+                "Predaj meč",
+                surrenderMatch));
+
         return;
     }
 
@@ -2254,6 +2646,11 @@ function renderMatchControls(match) {
             renderRequesterPausedControls(
                 match);
         }
+
+        matchControls.append(
+            createDangerControlButton(
+                "Predaj meč",
+                surrenderMatch));
     }
 }
 
@@ -2280,6 +2677,122 @@ function createControlButton(
         });
 
     return button;
+}
+
+function createDangerControlButton(text, action) {
+    const button =
+        createControlButton(
+            text,
+            action);
+
+    button.classList.add(
+        "danger-button");
+
+    return button;
+}
+
+async function showConfirmationDialog(
+    title,
+    message,
+    confirmText) {
+    confirmationTitle.textContent =
+        title;
+
+    confirmationMessage.textContent =
+        message;
+
+    confirmationConfirmButton.textContent =
+        confirmText;
+
+    confirmationDialog.returnValue = "";
+
+    const resultPromise =
+        new Promise(resolve => {
+            confirmationDialog.addEventListener(
+                "close",
+                () => {
+                    resolve(
+                        confirmationDialog.returnValue ===
+                        "confirm");
+                },
+                {
+                    once: true
+                });
+        });
+
+    confirmationDialog.showModal();
+
+    return await resultPromise;
+}
+
+async function surrenderMatch() {
+    if (!activeMatchId) {
+        return;
+    }
+
+    const confirmed =
+        await showConfirmationDialog(
+            "Predaj meč",
+            "Da li sigurno želite da predate meč? Protivnik će biti proglašen pobednikom.",
+            "Predaj meč");
+
+    if (!confirmed) {
+        return;
+    }
+
+    const response = await fetch(
+        `/api/matches/${activeMatchId}/surrender`,
+        {
+            method: "POST"
+        });
+
+    if (!response.ok) {
+        const error =
+            await readError(response);
+
+        gameMessage.textContent =
+            error;
+
+        await loadActiveMatch();
+
+        return;
+    }
+
+    await loadActiveMatch();
+}
+
+async function cancelWaitingMatch() {
+    if (!activeMatchId) {
+        return;
+    }
+
+    const confirmed =
+        await showConfirmationDialog(
+            "Odustani od čekanja",
+            "Da li želite da odustanete od čekanja? Kreirani meč će biti obrisan.",
+            "Odustani");
+
+    if (!confirmed) {
+        return;
+    }
+
+    const response = await fetch(
+        `/api/matches/${activeMatchId}/cancel`,
+        {
+            method: "POST"
+        });
+
+    if (!response.ok) {
+        const error =
+            await readError(response);
+
+        gameMessage.textContent =
+            error;
+
+        return;
+    }
+
+    await closeMatch();
 }
 
 function renderControllerInProgressControls(match) {
