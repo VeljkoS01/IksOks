@@ -329,55 +329,81 @@
                 </div>
             </section>
         </section>
-        <section id="match-view" class="match-view hidden">
+        <section id="match-view"
+                 class="match-view hidden">
+
             <div class="match-header">
                 <div>
-                    <h2 id="match-title">IksOks meč</h2>
-                    <p id="match-status" class="match-status"></p>
-                    <p id="match-join-code" class="match-join-code hidden"></p>
-                    <p id="turn-timer" class="turn-timer"></p>
-                    <p id="match-control-role" class="match-control-role"></p>
-                </div>
+                    <h2 id="match-title">
+                        IksOks meč
+                    </h2>
 
-                <div id="player-badge" class="match-symbol">
-                    Tvoj znak:
-                    <strong id="player-symbol">-</strong>
+                    <p id="match-status"
+                       class="match-status">
+                    </p>
+
+                    <p id="match-join-code"
+                       class="match-join-code hidden">
+                    </p>
+
+                    <p id="turn-timer"
+                       class="turn-timer">
+                    </p>
+
+                    <p id="match-control-role"
+                       class="match-control-role">
+                    </p>
                 </div>
             </div>
 
-            <div id="game-board"
-                 class="game-board"
-                 aria-label="IksOks tabla">
+            <div class="match-main-layout">
+                <div class="board-panel">
+                    <div id="game-board"
+                         class="game-board"
+                         aria-label="IksOks tabla">
+                    </div>
+                </div>
+
+                <aside class="match-side-panel">
+                    <div id="player-badge"
+                         class="match-symbol">
+                        Tvoj znak:
+                        <strong id="player-symbol">
+                            -
+                        </strong>
+                    </div>
+
+                    <p id="game-message"
+                       class="message match-game-message"
+                       aria-live="polite">
+                    </p>
+
+                    <div id="match-controls"
+                         class="match-controls">
+                    </div>
+
+                    <section class="emoji-chat">
+                        <div class="emoji-chat-header">
+                            <strong>Emoji chat</strong>
+                        </div>
+
+                        <div id="emoji-chat-messages"
+                             class="emoji-chat-messages"
+                             aria-live="polite">
+                        </div>
+
+                        <div id="emoji-chat-actions"
+                             class="emoji-chat-actions">
+                        </div>
+                    </section>
+
+                    <button id="back-to-lobby-button"
+                            class="secondary-button hidden"
+                            type="button">
+                        Nazad u lobby
+                    </button>
+                </aside>
             </div>
-
-            <section class="emoji-chat">
-                <div class="emoji-chat-header">
-                    <strong>Emoji chat</strong>
-                </div>
-
-                <div id="emoji-chat-messages"
-                     class="emoji-chat-messages"
-                     aria-live="polite">
-                </div>
-
-                <div id="emoji-chat-actions"
-                     class="emoji-chat-actions">
-                </div>
-            </section>
-
-            <p id="game-message"
-               class="message"
-               aria-live="polite">
-            </p>
-            <div id="match-controls"
-                 class="match-controls">
-            </div>
-
-            <button id="back-to-lobby-button"
-                    class="secondary-button hidden"
-                    type="button">
-                Nazad u lobby
-            </button>
         </section>
     </main>
 
