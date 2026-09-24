@@ -668,7 +668,14 @@ function renderBoard(match) {
     gameBoard.replaceChildren();
 
     gameBoard.style.gridTemplateColumns =
-        `repeat(${match.boardSize}, 1fr)`;
+        `repeat(${match.boardSize}, minmax(0, 1fr))`;
+
+    gameBoard.style.gridTemplateRows =
+        `repeat(${match.boardSize}, minmax(0, 1fr))`;
+
+    gameBoard.classList.toggle(
+        "compact-board",
+        match.boardSize >= 7);
 
     const movesByPosition = new Map();
 
