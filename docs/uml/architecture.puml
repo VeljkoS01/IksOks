@@ -1,0 +1,53 @@
+@startuml
+
+title IksOks - arhitektura sistema
+
+actor "Igrač 1" as Player1
+actor "Igrač 2" as Player2
+actor "Gledalac" as Spectator
+
+rectangle "Browser" {
+    component "HTML / CSS / JavaScript" as Frontend
+    component "SignalR Client" as SignalRClient
+}
+
+rectangle "ASP.NET Core aplikacija" {
+    component "HTTP Endpoints" as API
+    component "MatchHub" as Hub
+    component "Application Commands" as Commands
+    component "Domain" as Domain
+    component "EF Core" as EF
+    component "Outbox Publisher" as Outbox
+    component "Match Timeout Worker" as Timer
+}
+
+database "PostgreSQL" as PostgreSQL
+queue "RabbitMQ" as RabbitMQ
+
+component "MatchFinished Consumer" as Consumer
+
+Player1 --> Frontend
+Player2 --> Frontend
+Spectator --> Frontend
+
+Frontend --> API : HTTP
+SignalRClient <--> Hub : SignalR
+
+API --> Commands
+Commands --> Domain
+Commands --> EF
+
+Hub --> EF
+Timer --> EF
+
+EF --> PostgreSQL
+
+Outbox --> PostgreSQL : reads OutboxMessage
+Outbox --> RabbitMQ : publishes match.finished
+
+RabbitMQ --> Consumer
+Consumer --> PostgreSQL : rewards / processed events
+
+Hub --> SignalRClient : MatchUpdated\nLobbyUpdated\nEmojiReceived
+
+@enduml
