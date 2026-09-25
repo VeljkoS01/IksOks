@@ -1,0 +1,32 @@
+@startuml
+
+title State obrazac - stanje meča
+
+interface IMatchState {
+    + CanPause()
+    + CanResume()
+}
+
+class WaitingForOpponentState
+class InProgressState
+class PausedState
+class FinishedState
+
+class MatchStateFactory {
+    + Create(status) : IMatchState
+}
+
+IMatchState <|.. WaitingForOpponentState
+IMatchState <|.. InProgressState
+IMatchState <|.. PausedState
+IMatchState <|.. FinishedState
+
+MatchStateFactory --> IMatchState : creates
+
+WaitingForOpponentState --> InProgressState : opponent joins
+InProgressState --> PausedState : pause
+PausedState --> InProgressState : resume
+InProgressState --> FinishedState : win / draw / timeout
+PausedState --> FinishedState : surrender
+
+@enduml
