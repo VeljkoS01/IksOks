@@ -1,0 +1,249 @@
+﻿using IksOks.Web.Domain.Entities;
+using IksOks.Web.Domain.Enums;
+using IksOks.Web.Infrastructure.Persistence.Entities;
+using Microsoft.EntityFrameworkCore;
+
+namespace IksOks.Web.Infrastructure.Persistence;
+
+public sealed class IksOksDbContext : DbContext
+{
+    public IksOksDbContext(DbContextOptions<IksOksDbContext> options)
+        : base(options)
+    {
+    }
+
+    public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<UserPurchase> UserPurchases => Set<UserPurchase>();
+    public DbSet<GameMatch> Matches => Set<GameMatch>();
+    public DbSet<MatchMove> MatchMoves => Set<MatchMove>();
+    public DbSet<MatchFinishedEventRecord> MatchFinishedEvents => Set<MatchFinishedEventRecord>();
+    public DbSet<OutboxMessage> OutboxMessages => Set<OutboxMessage>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        var user = modelBuilder.Entity<AppUser>();
+
+        user.ToTable("Users");
+
+        user.HasKey(x => x.Id);
+
+        user.Property(x => x.UserName)
+            .HasMaxLength(32)
+            .IsRequired();
+
+        user.Property(x => x.NormalizedUserName)
+            .HasMaxLength(32)
+            .IsRequired();
+
+        user.HasIndex(x => x.NormalizedUserName)
+            .IsUnique();
+
+        user.Property(x => x.PasswordHash)
+            .HasMaxLength(512)
+            .IsRequired();
+
+        user.Property(x => x.TokenBalance)
+            .HasDefaultValue(30)
+            .IsRequired();
+
+        user.Property(x => x.ActiveBorderKey).HasMaxLength(64);
+
+        user.Property(x => x.CreatedAt)
+            .IsRequired();
+
+        var purchase = modelBuilder.Entity<UserPurchase>();
+
+        purchase.ToTable("UserPurchases");
+
+        purchase.HasKey(x => x.Id);
+
+        purchase.Property(x => x.ItemKey)
+            .HasMaxLength(64)
+            .IsRequired();
+
+        purchase.Property(x => x.PurchasedAt)
+            .IsRequired();
+
+        purchase.HasOne(x => x.User)
+            .WithMany()
+            .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        purchase.HasIndex(x => new
+        {
+            x.UserId,
+            x.ItemKey
+        })
+        .IsUnique();
+
+
+        var match = modelBuilder.Entity<GameMatch>();
+
+        match.ToTable("Matches");
+
+        match.HasKey(x => x.Id);
+
+        match.Property(x => x.BoardSize)
+            .IsRequired();
+
+        match.Property(x => x.WinLength)
+            .IsRequired();
+
+        match.Property(x => x.Status)
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired();
+
+        match.Property(x => x.CreatedAt)
+            .IsRequired();
+
+        match.HasOne(x => x.OwnerUser)
+            .WithMany()
+            .HasForeignKey(x => x.OwnerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        match.HasOne(x => x.OpponentUser)
+            .WithMany()
+            .HasForeignKey(x => x.OpponentUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        match.HasOne(x => x.WinnerUser)
+            .WithMany()
+            .HasForeignKey(x => x.WinnerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        match.Property(x => x.Mode)
+            .HasConversion<string>()
+            .HasMaxLength(32)
+            .IsRequired();
+
+        match.Property(x => x.Visibility)
+            .HasConversion<string>()
+            .HasMaxLength(16)
+            .HasDefaultValue(MatchVisibility.Public)
+            .IsRequired();
+
+        match.Property(x => x.JoinCode)
+            .HasMaxLength(12);
+
+        match.HasIndex(x => x.JoinCode)
+            .IsUnique();
+
+        match.HasOne(x => x.PauseRequestedByUser)
+            .WithMany()
+            .HasForeignKey(x => x.PauseRequestedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        match.HasOne(x => x.ResumeRequestedByUser)
+            .WithMany()
+            .HasForeignKey(x => x.ResumeRequestedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        match.Property(x => x.TurnDurationSeconds)
+            .IsRequired();
+
+        var move = modelBuilder.Entity<MatchMove>();
+
+        move.ToTable("MatchMoves");
+
+        move.HasKey(x => x.Id);
+
+        move.Property(x => x.Row)
+            .IsRequired();
+
+        move.Property(x => x.Column)
+            .IsRequired();
+
+        move.Property(x => x.MoveNumber)
+            .IsRequired();
+
+        move.Property(x => x.Symbol)
+            .HasMaxLength(1)
+            .IsRequired();
+
+        move.Property(x => x.CreatedAt)
+            .IsRequired();
+
+        move.HasOne(x => x.Match)
+            .WithMany(x => x.Moves)
+            .HasForeignKey(x => x.MatchId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        move.HasOne(x => x.PlayerUser)
+            .WithMany()
+            .HasForeignKey(x => x.PlayerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        move.HasIndex(x => new
+        {
+            x.MatchId,
+            x.Row,
+            x.Column
+        })
+        .IsUnique();
+
+        move.HasIndex(x => new
+        {
+            x.MatchId,
+            x.MoveNumber
+        })
+        .IsUnique();
+
+        var matchFinishedEvent = modelBuilder.Entity<MatchFinishedEventRecord>();
+
+        matchFinishedEvent.ToTable("MatchFinishedEvents");
+
+        matchFinishedEvent.HasKey(x => x.Id);
+
+        matchFinishedEvent.Property(x => x.EventId)
+            .IsRequired();
+
+        matchFinishedEvent.Property(x => x.MatchId)
+            .IsRequired();
+
+        matchFinishedEvent.Property(x => x.IsDraw)
+            .IsRequired();
+
+        matchFinishedEvent.Property(x => x.FinishedAt)
+            .IsRequired();
+
+        matchFinishedEvent.Property(x => x.ProcessedAt)
+            .IsRequired();
+
+        matchFinishedEvent
+            .HasIndex(x => x.EventId)
+            .IsUnique();
+
+        matchFinishedEvent
+            .HasIndex(x => x.MatchId);
+
+        var outbox = modelBuilder.Entity<OutboxMessage>();
+
+        outbox.ToTable("OutboxMessages");
+
+        outbox.HasKey(x => x.Id);
+
+        outbox.Property(x => x.RoutingKey)
+            .HasMaxLength(128)
+            .IsRequired();
+
+        outbox.Property(x => x.Payload)
+            .HasColumnType("text")
+            .IsRequired();
+
+        outbox.Property(x => x.OccurredAt)
+            .IsRequired();
+
+        outbox.Property(x => x.AttemptCount)
+            .IsRequired();
+
+        outbox.Property(x => x.LastError)
+            .HasMaxLength(2000);
+
+        outbox.HasIndex(x => new
+        {
+            x.ProcessedAt,
+            x.OccurredAt
+        });
+    }
+}

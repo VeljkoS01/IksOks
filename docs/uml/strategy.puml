@@ -1,0 +1,34 @@
+@startuml
+
+title Strategy obrazac - pravila igre
+
+interface IGameRulesStrategy {
+    + ValidateSettings(boardSize, winLength)
+    + DetectWinner(moves, boardSize, winLength)
+}
+
+class ClassicGameRulesStrategy {
+    + ValidateSettings(boardSize, winLength)
+    + DetectWinner(moves, boardSize, winLength)
+}
+
+class ConnectKGameRulesStrategy {
+    + ValidateSettings(boardSize, winLength)
+    + DetectWinner(moves, boardSize, winLength)
+}
+
+class GameRulesStrategyFactory {
+    + Create(mode) : IGameRulesStrategy
+}
+
+class WinnerDetector
+
+IGameRulesStrategy <|.. ClassicGameRulesStrategy
+IGameRulesStrategy <|.. ConnectKGameRulesStrategy
+
+GameRulesStrategyFactory --> IGameRulesStrategy : creates
+
+ClassicGameRulesStrategy --> WinnerDetector
+ConnectKGameRulesStrategy --> WinnerDetector
+
+@enduml

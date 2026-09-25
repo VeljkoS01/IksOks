@@ -1,0 +1,31 @@
+@startuml
+
+title Command obrazac - operacije nad mečem
+
+class MatchEndpoints
+
+class MakeMoveCommand
+
+class MakeMoveCommandHandler {
+    + HandleAsync(command)
+}
+
+class MatchControlCommandHandler {
+    + HandleAsync(...)
+}
+
+class MatchOperationLock
+
+class IksOksDbContext
+
+MatchEndpoints --> MakeMoveCommand : creates
+MatchEndpoints --> MakeMoveCommandHandler : executes
+MatchEndpoints --> MatchControlCommandHandler : executes
+
+MakeMoveCommandHandler --> MatchOperationLock
+MakeMoveCommandHandler --> IksOksDbContext
+
+MatchControlCommandHandler --> MatchOperationLock
+MatchControlCommandHandler --> IksOksDbContext
+
+@enduml
