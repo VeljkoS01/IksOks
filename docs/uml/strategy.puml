@@ -3,32 +3,34 @@
 title Strategy obrazac - pravila igre
 
 interface IGameRulesStrategy {
-    + ValidateSettings(boardSize, winLength)
-    + DetectWinner(moves, boardSize, winLength)
+    + IsValidConfiguration(boardSize, winLength) : bool
+    + IsWinningMove(moves, lastMove, winLength) : bool
 }
 
 class ClassicGameRulesStrategy {
-    + ValidateSettings(boardSize, winLength)
-    + DetectWinner(moves, boardSize, winLength)
+    + IsValidConfiguration(boardSize, winLength) : bool
+    + IsWinningMove(moves, lastMove, winLength) : bool
 }
 
 class ConnectKGameRulesStrategy {
-    + ValidateSettings(boardSize, winLength)
-    + DetectWinner(moves, boardSize, winLength)
+    + IsValidConfiguration(boardSize, winLength) : bool
+    + IsWinningMove(moves, lastMove, winLength) : bool
 }
 
 class GameRulesStrategyFactory {
-    + Create(mode) : IGameRulesStrategy
+    + GetStrategy(mode) : IGameRulesStrategy
 }
 
-class WinnerDetector
+class ConsecutiveSymbolsDetector {
+    + HasWinningSequence(moves, lastMove, requiredLength) : bool
+}
 
 IGameRulesStrategy <|.. ClassicGameRulesStrategy
 IGameRulesStrategy <|.. ConnectKGameRulesStrategy
 
-GameRulesStrategyFactory --> IGameRulesStrategy : creates
+GameRulesStrategyFactory --> IGameRulesStrategy : returns strategy
 
-ClassicGameRulesStrategy --> WinnerDetector
-ConnectKGameRulesStrategy --> WinnerDetector
+ClassicGameRulesStrategy --> ConsecutiveSymbolsDetector
+ConnectKGameRulesStrategy --> ConsecutiveSymbolsDetector
 
 @enduml
