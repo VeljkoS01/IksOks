@@ -462,10 +462,6 @@ createMatchForm.addEventListener(
 
         const match = await response.json();
 
-        showMatchMessage(
-            "Meč je uspešno napravljen.",
-            "success");
-
         await openMatch(match.id);
     });
 
