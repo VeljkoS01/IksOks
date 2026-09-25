@@ -3,30 +3,36 @@
 title State obrazac - stanje meča
 
 interface IMatchState {
-    + CanPause()
-    + CanResume()
+    + Status : MatchStatus
+    + CanJoin(match) : bool
+    + CanMakeMove(match) : bool
+    + CanPause(match) : bool
+    + CanResume(match) : bool
+    + OnOpponentJoined() : MatchStatus
+    + OnGameFinished() : MatchStatus
+    + OnPaused() : MatchStatus
+    + OnResumed() : MatchStatus
 }
 
-class WaitingForOpponentState
-class InProgressState
-class PausedState
-class FinishedState
+class WaitingForOpponentMatchState
+class InProgressMatchState
+class PausedMatchState
+class FinishedMatchState
 
 class MatchStateFactory {
-    + Create(status) : IMatchState
+    + GetState(status) : IMatchState
 }
 
-IMatchState <|.. WaitingForOpponentState
-IMatchState <|.. InProgressState
-IMatchState <|.. PausedState
-IMatchState <|.. FinishedState
+IMatchState <|.. WaitingForOpponentMatchState
+IMatchState <|.. InProgressMatchState
+IMatchState <|.. PausedMatchState
+IMatchState <|.. FinishedMatchState
 
-MatchStateFactory --> IMatchState : creates
+MatchStateFactory --> IMatchState : returns registered state
 
-WaitingForOpponentState --> InProgressState : opponent joins
-InProgressState --> PausedState : pause
-PausedState --> InProgressState : resume
-InProgressState --> FinishedState : win / draw / timeout
-PausedState --> FinishedState : surrender
+WaitingForOpponentMatchState --> InProgressMatchState : OnOpponentJoined()
+InProgressMatchState --> PausedMatchState : OnPaused()
+PausedMatchState --> InProgressMatchState : OnResumed()
+InProgressMatchState --> FinishedMatchState : OnGameFinished()
 
 @enduml
