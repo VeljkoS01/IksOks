@@ -9,28 +9,16 @@ namespace IksOks.Web.Endpoints;
 
 public static class StoreEndpoints
 {
-    public static IEndpointRouteBuilder MapStoreEndpoints(
-        this IEndpointRouteBuilder endpoints)
+    public static IEndpointRouteBuilder MapStoreEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints
             .MapGroup("/api/store")
             .RequireAuthorization();
 
-        group.MapGet(
-            "",
-            GetStoreAsync);
-
-        group.MapPost(
-            "/{itemKey}/purchase",
-            PurchaseItemAsync);
-
-        group.MapPost(
-            "/{itemKey}/activate",
-            ActivateBorderAsync);
-
-        group.MapDelete(
-            "/active-border",
-            ClearActiveBorderAsync);
+        group.MapGet("",  GetStoreAsync);
+        group.MapPost("/{itemKey}/purchase", PurchaseItemAsync);
+        group.MapPost("/{itemKey}/activate", ActivateBorderAsync);
+        group.MapDelete("/active-border", ClearActiveBorderAsync);
 
         return endpoints;
     }
@@ -60,8 +48,7 @@ public static class StoreEndpoints
                 user.TokenBalance,
                 user.ActiveBorderKey
             })
-            .SingleOrDefaultAsync(
-                cancellationToken);
+            .SingleOrDefaultAsync(cancellationToken);
 
         if (user is null)
         {
@@ -76,9 +63,8 @@ public static class StoreEndpoints
                 purchase.ItemKey)
             .ToListAsync(cancellationToken);
 
-        var ownedSet =
-            ownedKeys.ToHashSet(
-                StringComparer.OrdinalIgnoreCase);
+        var ownedSet = ownedKeys
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var items =
             StoreCatalog.Items
@@ -121,8 +107,7 @@ public static class StoreEndpoints
             return Results.Unauthorized();
         }
 
-        var item =
-            StoreCatalog.FindByKey(itemKey);
+        var item = StoreCatalog.FindByKey(itemKey);
 
         if (item is null)
         {
@@ -133,8 +118,8 @@ public static class StoreEndpoints
         }
 
         await using var transaction =
-            await db.Database.BeginTransactionAsync(
-                cancellationToken);
+            await db.Database
+            .BeginTransactionAsync(cancellationToken);
 
         var alreadyOwned =
             await db.UserPurchases
@@ -182,11 +167,9 @@ public static class StoreEndpoints
 
         try
         {
-            await db.SaveChangesAsync(
-                cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
 
-            await transaction.CommitAsync(
-                cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException)
         {
@@ -195,8 +178,7 @@ public static class StoreEndpoints
 
             return Results.Conflict(new
             {
-                error =
-                    "The item could not be purchased."
+                error = "The item could not be purchased."
             });
         }
 
@@ -215,10 +197,10 @@ public static class StoreEndpoints
     }
 
     private static async Task<IResult> ActivateBorderAsync(
-    string itemKey,
-    ClaimsPrincipal principal,
-    IksOksDbContext db,
-    CancellationToken cancellationToken)
+        string itemKey,
+        ClaimsPrincipal principal,
+        IksOksDbContext db,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -269,16 +251,15 @@ public static class StoreEndpoints
 
         user.ActiveBorderKey = item.Key;
 
-        await db.SaveChangesAsync(
-            cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
 
         return Results.NoContent();
     }
 
     private static async Task<IResult> ClearActiveBorderAsync(
-    ClaimsPrincipal principal,
-    IksOksDbContext db,
-    CancellationToken cancellationToken)
+        ClaimsPrincipal principal,
+        IksOksDbContext db,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -303,8 +284,7 @@ public static class StoreEndpoints
 
         user.ActiveBorderKey = null;
 
-        await db.SaveChangesAsync(
-            cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
 
         return Results.NoContent();
     }

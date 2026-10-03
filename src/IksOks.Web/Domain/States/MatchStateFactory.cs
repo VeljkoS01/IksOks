@@ -11,12 +11,10 @@ public sealed class MatchStateFactory
     public MatchStateFactory(
         IEnumerable<IMatchState> states)
     {
-        _states = states.ToDictionary(
-            state => state.Status);
+        _states = states.ToDictionary(state => state.Status);
     }
 
-    public IMatchState GetState(
-        MatchStatus status)
+    public IMatchState GetState(MatchStatus status)
     {
         if (_states.TryGetValue(
             status,

@@ -109,8 +109,7 @@ public static class StoreCatalog
                 35)
         };
 
-    public static StoreItemDefinition? FindByKey(
-        string key)
+    public static StoreItemDefinition? FindByKey(string key)
     {
         return Items.FirstOrDefault(
             item =>
@@ -120,8 +119,7 @@ public static class StoreCatalog
                     StringComparison.OrdinalIgnoreCase));
     }
 
-    public static StoreItemDefinition? FindEmoji(
-        string emoji)
+    public static StoreItemDefinition? FindEmoji(string emoji)
     {
         return Items.FirstOrDefault(
             item =>

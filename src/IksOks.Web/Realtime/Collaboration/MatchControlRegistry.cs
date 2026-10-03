@@ -23,11 +23,9 @@ public sealed class MatchControlRegistry
                 matchId,
                 out var participants))
             {
-                participants =
-                    new List<Participant>();
+                participants = new List<Participant>();
 
-                _participants[matchId] =
-                    participants;
+                _participants[matchId] = participants;
             }
 
             var alreadyJoined =
@@ -48,8 +46,7 @@ public sealed class MatchControlRegistry
         }
     }
 
-    public Guid? GetControllerUserId(
-        Guid matchId)
+    public Guid? GetControllerUserId(Guid matchId)
     {
         lock (_lock)
         {
@@ -107,41 +104,31 @@ public sealed class MatchControlRegistry
 
             if (participants.Count == 0)
             {
-                _participants.Remove(
-                    matchId);
+                _participants.Remove(matchId);
             }
 
-            return removed > 0 &&
-                   wasController;
+            return removed > 0 && wasController;
         }
     }
 
     public IReadOnlyList<Guid>
-        RemoveConnection(
-            string connectionId)
+        RemoveConnection(string connectionId)
     {
         lock (_lock)
         {
-            var changedMatches =
-                new List<Guid>();
+            var changedMatches = new List<Guid>();
 
-            var emptyMatches =
-                new List<Guid>();
+            var emptyMatches = new List<Guid>();
 
-            foreach (var pair
-                in _participants)
+            foreach (var pair in _participants)
             {
-                var matchId =
-                    pair.Key;
+                var matchId = pair.Key;
 
-                var participants =
-                    pair.Value;
+                var participants = pair.Value;
 
                 var wasController =
                     participants.Count > 0 &&
-                    participants[0]
-                        .ConnectionId ==
-                    connectionId;
+                    participants[0].ConnectionId == connectionId;
 
                 var removed =
                     participants.RemoveAll(
@@ -156,22 +143,18 @@ public sealed class MatchControlRegistry
 
                 if (wasController)
                 {
-                    changedMatches.Add(
-                        matchId);
+                    changedMatches.Add(matchId);
                 }
 
                 if (participants.Count == 0)
                 {
-                    emptyMatches.Add(
-                        matchId);
+                    emptyMatches.Add(matchId);
                 }
             }
 
-            foreach (var matchId
-                in emptyMatches)
+            foreach (var matchId in emptyMatches)
             {
-                _participants.Remove(
-                    matchId);
+                _participants.Remove(matchId);
             }
 
             return changedMatches;

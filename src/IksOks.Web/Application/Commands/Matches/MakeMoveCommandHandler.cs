@@ -51,7 +51,7 @@ public sealed class MakeMoveCommandHandler
             .SingleOrDefaultAsync(
                 match =>
                     match.Id == command.MatchId,
-                cancellationToken);
+                    cancellationToken);
 
         if (match is null)
         {
@@ -59,8 +59,7 @@ public sealed class MakeMoveCommandHandler
                 MakeMoveFailure.MatchNotFound);
         }
 
-        var state =
-            _stateFactory.GetState(match.Status);
+        var state = _stateFactory.GetState(match.Status);
 
         if (!state.CanMakeMove(match))
         {
@@ -74,8 +73,7 @@ public sealed class MakeMoveCommandHandler
                 MakeMoveFailure.TurnExpired);
         }
 
-        if (match.OpponentUserId
-            is not Guid opponentUserId)
+        if (match.OpponentUserId is not Guid opponentUserId)
         {
             return MakeMoveCommandResult.Failed(
                 MakeMoveFailure.MatchNotInProgress);
@@ -111,10 +109,9 @@ public sealed class MakeMoveCommandHandler
                 MakeMoveFailure.Occupied);
         }
 
-        var currentTurnUserId =
-            existingMoves.Count % 2 == 0
-                ? match.OwnerUserId
-                : opponentUserId;
+        var currentTurnUserId = existingMoves.Count % 2 == 0
+                                ? match.OwnerUserId
+                                : opponentUserId;
 
         if (currentTurnUserId != command.UserId)
         {
@@ -122,8 +119,7 @@ public sealed class MakeMoveCommandHandler
                 MakeMoveFailure.NotYourTurn);
         }
 
-        var symbol =
-            command.UserId == match.OwnerUserId
+        var symbol = command.UserId == match.OwnerUserId
                 ? "X"
                 : "O";
 
@@ -143,46 +139,31 @@ public sealed class MakeMoveCommandHandler
             .Append(move)
             .ToList();
 
-        var strategy =
-            _strategyFactory.GetStrategy(
-                match.Mode);
+        var strategy = _strategyFactory.GetStrategy(match.Mode);
 
         if (strategy.IsWinningMove(
             allMoves,
             move,
             match.WinLength))
         {
-            match.Status =
-                state.OnGameFinished();
-
-            match.WinnerUserId =
-                command.UserId;
-
-            match.FinishedAt =
-                DateTimeOffset.UtcNow;
+            match.Status = state.OnGameFinished();
+            match.WinnerUserId = command.UserId;
+            match.FinishedAt = DateTimeOffset.UtcNow;
         }
-        else if (
-            allMoves.Count ==
-            match.BoardSize * match.BoardSize)
+        else if (allMoves.Count == match.BoardSize * match.BoardSize)
         {
-            match.Status =
-                state.OnGameFinished();
-
+            match.Status = state.OnGameFinished();
             match.WinnerUserId = null;
-
-            match.FinishedAt =
-                DateTimeOffset.UtcNow;
+            match.FinishedAt = DateTimeOffset.UtcNow;
         }
 
         if (match.Status == MatchStatus.InProgress)
         {
-            match.TurnDeadlineAt =
-                DateTimeOffset.UtcNow.AddSeconds(
-                    match.TurnDurationSeconds);
+            match.TurnDeadlineAt = DateTimeOffset.UtcNow
+                .AddSeconds(match.TurnDurationSeconds);
         }
 
-        var matchFinished =
-            match.Status == MatchStatus.Finished;
+        var matchFinished = match.Status == MatchStatus.Finished;
 
         if (matchFinished)
         {
@@ -204,30 +185,21 @@ public sealed class MakeMoveCommandHandler
                 new OutboxMessage
                 {
                     Id = eventId,
-                    RoutingKey =
-                        "match.finished",
-
-                    Payload =
-                        JsonSerializer.Serialize(
-                            matchFinishedEvent),
-
-                    OccurredAt =
-                        match.FinishedAt.Value
+                    RoutingKey = "match.finished",
+                    Payload = JsonSerializer.Serialize(matchFinishedEvent),
+                    OccurredAt = match.FinishedAt.Value
                 });
         }
 
         try
         {
-            await _db.SaveChangesAsync(
-                cancellationToken);
+            await _db.SaveChangesAsync(cancellationToken);
 
-            await transaction.CommitAsync(
-                cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException)
         {
-            await transaction.RollbackAsync(
-                cancellationToken);
+            await transaction.RollbackAsync(cancellationToken);
 
             return MakeMoveCommandResult.Failed(
                 MakeMoveFailure.Conflict);

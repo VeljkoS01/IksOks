@@ -76,7 +76,6 @@ public sealed class IksOksDbContext : DbContext
         })
         .IsUnique();
 
-
         var match = modelBuilder.Entity<GameMatch>();
 
         match.ToTable("Matches");

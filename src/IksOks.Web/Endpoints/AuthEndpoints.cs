@@ -14,15 +14,13 @@ public static class AuthEndpoints
     public static IEndpointRouteBuilder MapAuthEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints.MapGroup("/api/auth");
+        var group = endpoints
+            .MapGroup("/api/auth");
 
         group.MapPost("/register", RegisterAsync);
-
         group.MapPost("/login", LoginAsync);
-
         group.MapGet("/me", GetCurrentUser)
             .RequireAuthorization();
-
         group.MapPost("/logout", LogoutAsync)
             .RequireAuthorization();
 
@@ -99,11 +97,11 @@ public static class AuthEndpoints
     }
 
     private static async Task<IResult> LoginAsync(
-    LoginRequest request,
-    IksOksDbContext db,
-    IPasswordHasher<AppUser> passwordHasher,
-    HttpContext httpContext,
-    CancellationToken cancellationToken)
+        LoginRequest request,
+        IksOksDbContext db,
+        IPasswordHasher<AppUser> passwordHasher,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
     {
         var normalizedUserName = request.UserName
             .Trim()
@@ -138,10 +136,10 @@ public static class AuthEndpoints
         }
 
         var claims = new List<Claim>
-    {
-        new(ClaimTypes.NameIdentifier, user.Id.ToString()),
-        new(ClaimTypes.Name, user.UserName)
-    };
+        {
+            new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(ClaimTypes.Name, user.UserName)
+        };
 
         var identity = new ClaimsIdentity(
             claims,
@@ -159,8 +157,7 @@ public static class AuthEndpoints
                 user.UserName));
     }
 
-    private static IResult GetCurrentUser(
-    ClaimsPrincipal principal)
+    private static IResult GetCurrentUser(ClaimsPrincipal principal)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -182,13 +179,10 @@ public static class AuthEndpoints
                 userName));
     }
 
-    private static async Task LogoutAsync(
-    HttpContext httpContext)
+    private static async Task LogoutAsync(HttpContext httpContext)
     {
-        httpContext.Response.StatusCode =
-            StatusCodes.Status204NoContent;
+        httpContext.Response.StatusCode = StatusCodes.Status204NoContent;
 
-        await httpContext.SignOutAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme);
+        await httpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     }
 }

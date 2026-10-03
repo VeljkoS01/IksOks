@@ -20,6 +20,5 @@ public sealed class MatchMove
 
     public string Symbol { get; set; } = string.Empty;
 
-    public DateTimeOffset CreatedAt { get; set; }
-        = DateTimeOffset.UtcNow;
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 }

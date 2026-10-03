@@ -4,11 +4,9 @@ namespace IksOks.Web.Domain.Strategies;
 
 public sealed class GameRulesStrategyFactory
 {
-    private readonly ClassicGameRulesStrategy
-        _classicStrategy;
+    private readonly ClassicGameRulesStrategy _classicStrategy;
 
-    private readonly ConnectKGameRulesStrategy
-        _connectKStrategy;
+    private readonly ConnectKGameRulesStrategy _connectKStrategy;
 
     public GameRulesStrategyFactory(
         ClassicGameRulesStrategy classicStrategy,
@@ -18,16 +16,13 @@ public sealed class GameRulesStrategyFactory
         _connectKStrategy = connectKStrategy;
     }
 
-    public IGameRulesStrategy GetStrategy(
-        MatchMode mode)
+    public IGameRulesStrategy GetStrategy(MatchMode mode)
     {
         return mode switch
         {
-            MatchMode.Classic =>
-                _classicStrategy,
+            MatchMode.Classic => _classicStrategy,
 
-            MatchMode.ConnectK =>
-                _connectKStrategy,
+            MatchMode.ConnectK => _connectKStrategy,
 
             _ => throw new ArgumentOutOfRangeException(
                 nameof(mode),

@@ -65,8 +65,7 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.MatchNotFound);
         }
 
-        var state =
-            _stateFactory.GetState(match.Status);
+        var state = _stateFactory.GetState(match.Status);
 
         if (!state.CanPause(match))
         {
@@ -89,14 +88,11 @@ public sealed class MatchControlCommandHandler
                     .PauseRequestAlreadyExists);
         }
 
-        match.PauseRequestedByUserId =
-            command.UserId;
+        match.PauseRequestedByUserId = command.UserId;
 
-        match.PauseRequestedAt =
-            DateTimeOffset.UtcNow;
+        match.PauseRequestedAt = DateTimeOffset.UtcNow;
 
-        await _db.SaveChangesAsync(
-            cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
 
         return MatchControlCommandResult.Success();
     }
@@ -130,8 +126,7 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.Forbidden);
         }
 
-        var state =
-            _stateFactory.GetState(match.Status);
+        var state = _stateFactory.GetState(match.Status);
 
         if (!state.CanPause(match))
         {
@@ -157,14 +152,12 @@ public sealed class MatchControlCommandHandler
             match.PausedTurnSecondsRemaining =
                 Math.Max(
                     0,
-                    (int)Math.Ceiling(
-                        remaining.TotalSeconds));
+                    (int)Math.Ceiling(remaining.TotalSeconds));
         }
 
         match.TurnDeadlineAt = null;
 
-        match.Status =
-            state.OnPaused();
+        match.Status = state.OnPaused();
 
         match.PauseRequestedByUserId = null;
         match.PauseRequestedAt = null;
@@ -172,8 +165,7 @@ public sealed class MatchControlCommandHandler
         match.ResumeRequestedByUserId = null;
         match.ResumeRequestedAt = null;
 
-        await _db.SaveChangesAsync(
-            cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
 
         return MatchControlCommandResult.Success();
     }
@@ -207,8 +199,7 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.Forbidden);
         }
 
-        var state =
-            _stateFactory.GetState(match.Status);
+        var state = _stateFactory.GetState(match.Status);
 
         if (!state.CanPause(match))
         {
@@ -226,8 +217,7 @@ public sealed class MatchControlCommandHandler
         match.PauseRequestedByUserId = null;
         match.PauseRequestedAt = null;
 
-        await _db.SaveChangesAsync(
-            cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
 
         return MatchControlCommandResult.Success();
     }
@@ -261,8 +251,7 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.Forbidden);
         }
 
-        var state =
-            _stateFactory.GetState(match.Status);
+        var state = _stateFactory.GetState(match.Status);
 
         if (!state.CanResume(match))
         {
@@ -274,12 +263,10 @@ public sealed class MatchControlCommandHandler
             match.PausedTurnSecondsRemaining
             ?? match.TurnDurationSeconds;
 
-        match.Status =
-            state.OnResumed();
+        match.Status = state.OnResumed();
 
         match.TurnDeadlineAt =
-            DateTimeOffset.UtcNow.AddSeconds(
-                remainingSeconds);
+            DateTimeOffset.UtcNow.AddSeconds(remainingSeconds);
 
         match.PausedTurnSecondsRemaining = null;
 
@@ -289,8 +276,7 @@ public sealed class MatchControlCommandHandler
         match.PauseRequestedByUserId = null;
         match.PauseRequestedAt = null;
 
-        await _db.SaveChangesAsync(
-            cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
 
         return MatchControlCommandResult.Success();
     }
@@ -316,8 +302,7 @@ public sealed class MatchControlCommandHandler
                 MatchControlFailure.MatchNotFound);
         }
 
-        var state =
-            _stateFactory.GetState(match.Status);
+        var state = _stateFactory.GetState(match.Status);
 
         if (!state.CanResume(match))
         {
@@ -340,14 +325,11 @@ public sealed class MatchControlCommandHandler
                     .ResumeRequestAlreadyExists);
         }
 
-        match.ResumeRequestedByUserId =
-            command.UserId;
+        match.ResumeRequestedByUserId = command.UserId;
 
-        match.ResumeRequestedAt =
-            DateTimeOffset.UtcNow;
+        match.ResumeRequestedAt = DateTimeOffset.UtcNow;
 
-        await _db.SaveChangesAsync(
-            cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
 
         return MatchControlCommandResult.Success();
     }
@@ -391,8 +373,7 @@ public sealed class MatchControlCommandHandler
         match.ResumeRequestedByUserId = null;
         match.ResumeRequestedAt = null;
 
-        await _db.SaveChangesAsync(
-            cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
 
         return MatchControlCommandResult.Success();
     }

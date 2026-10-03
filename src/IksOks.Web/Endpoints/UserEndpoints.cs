@@ -11,17 +11,11 @@ public static class UserEndpoints
     public static IEndpointRouteBuilder MapUserEndpoints(
         this IEndpointRouteBuilder endpoints)
     {
-        var group = endpoints
-            .MapGroup("/api/users")
+        var group = endpoints.MapGroup("/api/users")
             .RequireAuthorization();
 
-        group.MapGet(
-            "/me/profile",
-            GetMyProfileAsync);
-
-        group.MapGet(
-            "/leaderboard",
-            GetLeaderboardAsync);
+        group.MapGet("/me/profile", GetMyProfileAsync);
+        group.MapGet("/leaderboard", GetLeaderboardAsync);
 
         return endpoints;
     }
@@ -64,31 +58,23 @@ public static class UserEndpoints
             .Select(match => match.WinnerUserId)
             .ToListAsync(cancellationToken);
 
-        var matchesPlayed =
-            matchResults.Count;
+        var matchesPlayed = matchResults.Count;
 
-        var wins =
-            matchResults.Count(
-                winnerUserId =>
+        var wins = matchResults.Count(winnerUserId =>
                     winnerUserId == userId);
 
-        var draws =
-            matchResults.Count(
-                winnerUserId =>
+        var draws = matchResults.Count( winnerUserId =>
                     winnerUserId is null);
 
-        var losses =
-            matchesPlayed - wins - draws;
+        var losses = matchesPlayed - wins - draws;
 
-        var points =
-            wins * 3 + draws;
+        var points = wins * 3 + draws;
 
-        var winRate =
-            matchesPlayed == 0
-                ? 0
-                : Math.Round(
-                    wins * 100.0 / matchesPlayed,
-                    1);
+        var winRate = matchesPlayed == 0
+                    ? 0
+                    : Math.Round(
+                        wins * 100.0 / matchesPlayed,
+                        1);
 
         return Results.Ok(
             new UserProfileResponse(
@@ -141,32 +127,24 @@ public static class UserEndpoints
                             match.OpponentUserId == user.Id)
                         .ToList();
 
-                var matchesPlayed =
-                    userMatches.Count;
+                var matchesPlayed = userMatches.Count;
 
-                var wins =
-                    userMatches.Count(
-                        match =>
+                var wins = userMatches.Count(match =>
                             match.WinnerUserId == user.Id);
 
-                var draws =
-                    userMatches.Count(
-                        match =>
+                var draws = userMatches.Count(match =>
                             match.WinnerUserId is null);
 
-                var losses =
-                    matchesPlayed - wins - draws;
+                var losses = matchesPlayed - wins - draws;
 
-                var points =
-                    wins * 3 + draws;
+                var points = wins * 3 + draws;
 
-                var winRate =
-                    matchesPlayed == 0
-                        ? 0
-                        : Math.Round(
-                            wins * 100.0 /
-                            matchesPlayed,
-                            1);
+                var winRate = matchesPlayed == 0
+                            ? 0
+                            : Math.Round(
+                                wins * 100.0 /
+                                matchesPlayed,
+                                1);
 
                 return new LeaderboardEntryResponse(
                     0,
@@ -181,14 +159,14 @@ public static class UserEndpoints
             })
             .Where(entry =>
                 entry.MatchesPlayed > 0)
-            .OrderByDescending(
-                entry => entry.Points)
-            .ThenByDescending(
-                entry => entry.Wins)
-            .ThenByDescending(
-                entry => entry.WinRate)
-            .ThenBy(
-                entry => entry.UserName,
+            .OrderByDescending(entry =>
+                entry.Points)
+            .ThenByDescending(entry =>
+                entry.Wins)
+            .ThenByDescending(entry =>
+                entry.WinRate)
+            .ThenBy(entry =>
+                entry.UserName,
                 StringComparer.OrdinalIgnoreCase)
             .Take(50)
             .ToList();

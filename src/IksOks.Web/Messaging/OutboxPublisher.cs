@@ -8,8 +8,7 @@ namespace IksOks.Web.Messaging;
 public sealed class OutboxPublisher
     : BackgroundService
 {
-    private const string MatchFinishedRoutingKey =
-        "match.finished";
+    private const string MatchFinishedRoutingKey = "match.finished";
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IEventPublisher _eventPublisher;
@@ -32,8 +31,7 @@ public sealed class OutboxPublisher
         {
             try
             {
-                await PublishPendingMessagesAsync(
-                    stoppingToken);
+                await PublishPendingMessagesAsync(stoppingToken);
             }
             catch (OperationCanceledException)
                 when (stoppingToken.IsCancellationRequested)
@@ -63,21 +61,16 @@ public sealed class OutboxPublisher
     private async Task PublishPendingMessagesAsync(
         CancellationToken cancellationToken)
     {
-        using var scope =
-            _scopeFactory.CreateScope();
+        using var scope = _scopeFactory.CreateScope();
 
-        var db =
-            scope.ServiceProvider
-                .GetRequiredService<IksOksDbContext>();
+        var db = scope.ServiceProvider
+            .GetRequiredService<IksOksDbContext>();
 
-        var messages =
-            await db.OutboxMessages
-                .Where(message =>
-                    message.ProcessedAt == null)
-                .OrderBy(message =>
-                    message.OccurredAt)
-                .Take(20)
-                .ToListAsync(cancellationToken);
+        var messages = await db.OutboxMessages
+                        .Where(message => message.ProcessedAt == null)
+                        .OrderBy(message => message.OccurredAt)
+                        .Take(20)
+                        .ToListAsync(cancellationToken);
 
         foreach (var message in messages)
         {
@@ -85,17 +78,14 @@ public sealed class OutboxPublisher
 
             try
             {
-                if (message.RoutingKey !=
-                    MatchFinishedRoutingKey)
+                if (message.RoutingKey != MatchFinishedRoutingKey)
                 {
                     throw new InvalidOperationException(
                         $"Unknown routing key: {message.RoutingKey}");
                 }
 
                 var matchFinishedEvent =
-                    JsonSerializer.Deserialize<
-                        MatchFinishedEvent>(
-                        message.Payload);
+                    JsonSerializer.Deserialize<MatchFinishedEvent>(message.Payload);
 
                 if (matchFinishedEvent is null)
                 {
@@ -108,8 +98,7 @@ public sealed class OutboxPublisher
                         matchFinishedEvent,
                         cancellationToken);
 
-                message.ProcessedAt =
-                    DateTimeOffset.UtcNow;
+                message.ProcessedAt = DateTimeOffset.UtcNow;
 
                 message.LastError = null;
 
@@ -132,8 +121,7 @@ public sealed class OutboxPublisher
                     message.Id);
             }
 
-            await db.SaveChangesAsync(
-                cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
         }
     }
 }

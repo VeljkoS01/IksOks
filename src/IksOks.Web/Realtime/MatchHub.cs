@@ -44,8 +44,7 @@ public sealed class MatchHub : Hub
 
         if (!Guid.TryParse(userIdValue, out var userId))
         {
-            throw new HubException(
-                "Authenticated user was not found.");
+            throw new HubException("Authenticated user was not found.");
         }
 
         var match = await _db.Matches
@@ -56,8 +55,7 @@ public sealed class MatchHub : Hub
 
         if (match is null)
         {
-            throw new HubException(
-                "Match was not found.");
+            throw new HubException("Match was not found.");
         }
 
         var isParticipant =
@@ -66,20 +64,16 @@ public sealed class MatchHub : Hub
 
         var canSpectate =
             match.Visibility ==
-                MatchVisibility.Public &&
+            MatchVisibility.Public &&
             (
-                match.Status ==
-                    MatchStatus.InProgress ||
-                match.Status ==
-                    MatchStatus.Paused ||
-                match.Status ==
-                    MatchStatus.Finished
+                match.Status == MatchStatus.InProgress ||
+                match.Status == MatchStatus.Paused ||
+                match.Status == MatchStatus.Finished
             );
 
         if (!isParticipant && !canSpectate)
         {
-            throw new HubException(
-                "You do not have access to this match.");
+            throw new HubException("You do not have access to this match.");
         }
 
         await Groups.AddToGroupAsync(
@@ -96,8 +90,7 @@ public sealed class MatchHub : Hub
         }
 
         return _controlRegistry
-            .GetControllerUserId(
-                matchId);
+            .GetControllerUserId(matchId);
     }
 
     public async Task SendEmoji(Guid matchId, string emoji)
@@ -110,19 +103,16 @@ public sealed class MatchHub : Hub
             userIdValue,
             out var userId))
         {
-            throw new HubException(
-                "Authenticated user was not found.");
+            throw new HubException("Authenticated user was not found.");
         }
 
         if (!BasicEmojis.Contains(emoji))
         {
-            var premiumEmoji =
-                StoreCatalog.FindEmoji(emoji);
+            var premiumEmoji = StoreCatalog.FindEmoji(emoji);
 
             if (premiumEmoji is null)
             {
-                throw new HubException(
-                    "Emoji is not allowed.");
+                throw new HubException("Emoji is not allowed.");
             }
 
             var ownsEmoji =
@@ -137,8 +127,7 @@ public sealed class MatchHub : Hub
 
             if (!ownsEmoji)
             {
-                throw new HubException(
-                    "You do not own this emoji.");
+                throw new HubException("You do not own this emoji.");
             }
         }
 
@@ -150,8 +139,7 @@ public sealed class MatchHub : Hub
 
         if (match is null)
         {
-            throw new HubException(
-                "Match was not found.");
+            throw new HubException("Match was not found.");
         }
 
         var isParticipant =
@@ -160,8 +148,7 @@ public sealed class MatchHub : Hub
 
         if (!isParticipant)
         {
-            throw new HubException(
-                "Only match participants can send emojis.");
+            throw new HubException("Only match participants can send emojis.");
         }
 
         var canChat =
@@ -170,8 +157,7 @@ public sealed class MatchHub : Hub
 
         if (!canChat)
         {
-            throw new HubException(
-                "Emoji chat is not available in the current match state.");
+            throw new HubException("Emoji chat is not available in the current match state.");
         }
 
         var userName =
@@ -196,8 +182,7 @@ public sealed class MatchHub : Hub
                 Context.ConnectionAborted);
     }
 
-    private async Task ClearPendingControlRequestsAsync(
-    Guid matchId)
+    private async Task ClearPendingControlRequestsAsync(Guid matchId)
     {
         var match = await _db.Matches
             .SingleOrDefaultAsync(
@@ -225,17 +210,13 @@ public sealed class MatchHub : Hub
         match.ResumeRequestedByUserId = null;
         match.ResumeRequestedAt = null;
 
-        await _db.SaveChangesAsync(
-            CancellationToken.None);
+        await _db.SaveChangesAsync(CancellationToken.None);
     }
 
-    private async Task NotifyControlChangedAsync(
-        Guid matchId)
+    private async Task NotifyControlChangedAsync(Guid matchId)
     {
-        var controllerUserId =
-            _controlRegistry
-                .GetControllerUserId(
-                    matchId);
+        var controllerUserId = _controlRegistry
+            .GetControllerUserId(matchId);
 
         await Clients
             .Group(GroupName(matchId))
@@ -249,18 +230,14 @@ public sealed class MatchHub : Hub
                 CancellationToken.None);
     }
 
-    private async Task HandleControlTransferAsync(
-        Guid matchId)
+    private async Task HandleControlTransferAsync(Guid matchId)
     {
-        await ClearPendingControlRequestsAsync(
-            matchId);
+        await ClearPendingControlRequestsAsync(matchId);
 
-        await NotifyControlChangedAsync(
-            matchId);
+        await NotifyControlChangedAsync(matchId);
     }
 
-    public async Task LeaveMatch(
-    Guid matchId)
+    public async Task LeaveMatch(Guid matchId)
     {
         var controlChanged =
             _controlRegistry.Leave(
@@ -274,27 +251,20 @@ public sealed class MatchHub : Hub
 
         if (controlChanged)
         {
-            await HandleControlTransferAsync(
-                matchId);
+            await HandleControlTransferAsync(matchId);
         }
     }
 
-    public override async Task OnDisconnectedAsync(
-    Exception? exception)
+    public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        var changedMatches =
-            _controlRegistry
-                .RemoveConnection(
-                    Context.ConnectionId);
+        var changedMatches = _controlRegistry
+                .RemoveConnection(Context.ConnectionId);
 
-        foreach (var matchId
-            in changedMatches)
+        foreach (var matchId in changedMatches)
         {
-            await HandleControlTransferAsync(
-                matchId);
+            await HandleControlTransferAsync(matchId);
         }
 
-        await base.OnDisconnectedAsync(
-            exception);
+        await base.OnDisconnectedAsync(exception);
     }
 }

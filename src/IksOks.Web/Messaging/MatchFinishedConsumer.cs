@@ -14,8 +14,7 @@ namespace IksOks.Web.Messaging;
 public sealed class MatchFinishedConsumer
     : BackgroundService
 {
-    private const string RoutingKey =
-        "match.finished";
+    private const string RoutingKey = "match.finished";
 
     private const int WinnerReward = 10;
     private const int LoserReward = 4;
@@ -41,8 +40,7 @@ public sealed class MatchFinishedConsumer
         _hub = hub;
     }
 
-    protected override Task ExecuteAsync(
-        CancellationToken stoppingToken)
+    protected override Task ExecuteAsync(CancellationToken stoppingToken)
     {
         var factory = new ConnectionFactory
         {
@@ -53,11 +51,9 @@ public sealed class MatchFinishedConsumer
             DispatchConsumersAsync = true
         };
 
-        _connection =
-            factory.CreateConnection();
+        _connection = factory.CreateConnection();
 
-        _channel =
-            _connection.CreateModel();
+        _channel = _connection.CreateModel();
 
         _channel.ExchangeDeclare(
             exchange: _options.ExchangeName,
@@ -81,8 +77,7 @@ public sealed class MatchFinishedConsumer
             prefetchCount: 1,
             global: false);
 
-        var consumer =
-            new AsyncEventingBasicConsumer(_channel);
+        var consumer = new AsyncEventingBasicConsumer(_channel);
 
         consumer.Received += async (_, eventArgs) =>
         {
@@ -129,13 +124,10 @@ public sealed class MatchFinishedConsumer
                 return;
             }
 
-            using var scope =
-                _scopeFactory.CreateScope();
+            using var scope = _scopeFactory.CreateScope();
 
-            var db =
-                scope.ServiceProvider
-                    .GetRequiredService<
-                        IksOksDbContext>();
+            var db = scope.ServiceProvider
+                .GetRequiredService<IksOksDbContext>();
 
             var alreadyProcessed =
                 await db.MatchFinishedEvents
@@ -167,55 +159,32 @@ public sealed class MatchFinishedConsumer
                 {
                     if (message.IsDraw)
                     {
-                        owner.TokenBalance +=
-                            DrawReward;
-
-                        opponent.TokenBalance +=
-                            DrawReward;
+                        owner.TokenBalance += DrawReward;
+                        opponent.TokenBalance += DrawReward;
                     }
-                    else if (
-                        message.WinnerUserId ==
-                        owner.Id)
+                    else if (message.WinnerUserId == owner.Id)
                     {
-                        owner.TokenBalance +=
-                            WinnerReward;
-
-                        opponent.TokenBalance +=
-                            LoserReward;
+                        owner.TokenBalance += WinnerReward;
+                        opponent.TokenBalance += LoserReward;
                     }
-                    else if (
-                        message.WinnerUserId ==
-                        opponent.Id)
+                    else if (message.WinnerUserId == opponent.Id)
                     {
-                        opponent.TokenBalance +=
-                            WinnerReward;
-
-                        owner.TokenBalance +=
-                            LoserReward;
+                        opponent.TokenBalance += WinnerReward;
+                        owner.TokenBalance += LoserReward;
                     }
                 }
 
                 db.MatchFinishedEvents.Add(
                     new MatchFinishedEventRecord
                     {
-                        EventId =
-                            message.EventId,
-
-                        MatchId =
-                            message.MatchId,
-
-                        WinnerUserId =
-                            message.WinnerUserId,
-
-                        IsDraw =
-                            message.IsDraw,
-
-                        FinishedAt =
-                            message.FinishedAt
+                        EventId = message.EventId,
+                        MatchId = message.MatchId,
+                        WinnerUserId = message.WinnerUserId,
+                        IsDraw = message.IsDraw,
+                        FinishedAt = message.FinishedAt
                     });
 
-                await db.SaveChangesAsync(
-                    cancellationToken);
+                await db.SaveChangesAsync(cancellationToken);
 
                 await _hub.Clients
                     .User(message.OwnerUserId.ToString())

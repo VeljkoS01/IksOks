@@ -8,16 +8,12 @@ namespace IksOks.Web.Messaging;
 public sealed class RabbitMqEventPublisher
     : IEventPublisher, IDisposable
 {
-    private const string MatchFinishedRoutingKey =
-        "match.finished";
-
+    private const string MatchFinishedRoutingKey = "match.finished";
     private readonly RabbitMqOptions _options;
     private readonly object _connectionLock = new();
-
     private IConnection? _connection;
 
-    public RabbitMqEventPublisher(
-        IOptions<RabbitMqOptions> options)
+    public RabbitMqEventPublisher(IOptions<RabbitMqOptions> options)
     {
         _options = options.Value;
     }
@@ -40,17 +36,14 @@ public sealed class RabbitMqEventPublisher
             durable: true,
             autoDelete: false);
 
-        var body =
-            JsonSerializer.SerializeToUtf8Bytes(message);
+        var body = JsonSerializer.SerializeToUtf8Bytes(message);
 
-        var properties =
-            channel.CreateBasicProperties();
+        var properties = channel.CreateBasicProperties();
 
         properties.Persistent = true;
         properties.ContentType = "application/json";
         properties.Type = MatchFinishedRoutingKey;
-        properties.MessageId =
-            message.EventId.ToString();
+        properties.MessageId = message.EventId.ToString();
 
         channel.BasicPublish(
             exchange: _options.ExchangeName,
@@ -87,8 +80,7 @@ public sealed class RabbitMqEventPublisher
                 Password = _options.Password
             };
 
-            _connection =
-                factory.CreateConnection();
+            _connection = factory.CreateConnection();
 
             return _connection;
         }

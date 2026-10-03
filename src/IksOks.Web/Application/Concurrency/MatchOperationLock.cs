@@ -17,11 +17,9 @@ public sealed class MatchOperationLock
                 matchId,
                 _ => new SemaphoreSlim(1, 1));
 
-        await semaphore.WaitAsync(
-            cancellationToken);
+        await semaphore.WaitAsync(cancellationToken);
 
-        return new ReleaseHandle(
-            semaphore);
+        return new ReleaseHandle(semaphore);
     }
 
     private sealed class ReleaseHandle
@@ -29,8 +27,7 @@ public sealed class MatchOperationLock
     {
         private SemaphoreSlim? _semaphore;
 
-        public ReleaseHandle(
-            SemaphoreSlim semaphore)
+        public ReleaseHandle(SemaphoreSlim semaphore)
         {
             _semaphore = semaphore;
         }

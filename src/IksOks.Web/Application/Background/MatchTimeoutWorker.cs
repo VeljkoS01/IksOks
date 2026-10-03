@@ -37,8 +37,7 @@ public sealed class MatchTimeoutWorker
         {
             try
             {
-                await ProcessTimeoutsAsync(
-                    stoppingToken);
+                await ProcessTimeoutsAsync(stoppingToken);
             }
             catch (OperationCanceledException)
                 when (stoppingToken.IsCancellationRequested)
@@ -61,15 +60,12 @@ public sealed class MatchTimeoutWorker
     private async Task ProcessTimeoutsAsync(
         CancellationToken cancellationToken)
     {
-        using var scope =
-            _scopeFactory.CreateScope();
+        using var scope = _scopeFactory.CreateScope();
 
-        var db =
-            scope.ServiceProvider
-                .GetRequiredService<IksOksDbContext>();
+        var db = scope.ServiceProvider
+            .GetRequiredService<IksOksDbContext>();
 
-        var now =
-    DateTimeOffset.UtcNow;
+        var now = DateTimeOffset.UtcNow;
 
         var expiredMatchIds =
             await db.Matches
@@ -77,12 +73,11 @@ public sealed class MatchTimeoutWorker
                 .Where(match =>
                     match.Status ==
                         MatchStatus.InProgress &&
-                    match.TurnDeadlineAt != null &&
-                    match.TurnDeadlineAt <= now &&
-                    match.OpponentUserId != null)
+                        match.TurnDeadlineAt != null &&
+                        match.TurnDeadlineAt <= now &&
+                        match.OpponentUserId != null)
                 .Select(match => match.Id)
-                .ToListAsync(
-                    cancellationToken);
+                .ToListAsync(cancellationToken);
 
         foreach (var matchId in expiredMatchIds)
         {
@@ -92,8 +87,7 @@ public sealed class MatchTimeoutWorker
                 matchId,
                 cancellationToken);
 
-            var checkTime =
-                DateTimeOffset.UtcNow;
+            var checkTime = DateTimeOffset.UtcNow;
 
             var match = await db.Matches
                 .Include(match => match.Moves)
@@ -104,8 +98,7 @@ public sealed class MatchTimeoutWorker
 
             if (
                 match is null ||
-                match.Status !=
-                    MatchStatus.InProgress ||
+                match.Status != MatchStatus.InProgress ||
                 match.TurnDeadlineAt is null ||
                 match.TurnDeadlineAt > checkTime ||
                 match.OpponentUserId is null)
@@ -113,8 +106,7 @@ public sealed class MatchTimeoutWorker
                 continue;
             }
 
-            var opponentId =
-                match.OpponentUserId!.Value;
+            var opponentId = match.OpponentUserId!.Value;
 
             var currentTurnUserId =
                 match.Moves.Count % 2 == 0
@@ -127,20 +119,16 @@ public sealed class MatchTimeoutWorker
                     ? opponentId
                     : match.OwnerUserId;
 
-            match.Status =
-                MatchStatus.Finished;
+            match.Status = MatchStatus.Finished;
 
-            match.WinnerUserId =
-                winnerUserId;
+            match.WinnerUserId = winnerUserId;
 
-            match.FinishedAt = 
-                checkTime;
+            match.FinishedAt =  checkTime;
 
             match.TurnDeadlineAt = null;
             match.PausedTurnSecondsRemaining = null;
 
-            var eventId =
-                Guid.NewGuid();
+            var eventId = Guid.NewGuid();
 
             var finishedEvent =
                 new MatchFinishedEvent(
@@ -158,22 +146,15 @@ public sealed class MatchTimeoutWorker
                 new OutboxMessage
                 {
                     Id = eventId,
-                    RoutingKey =
-                        "match.finished",
-                    Payload =
-                        JsonSerializer.Serialize(
-                            finishedEvent),
-                    OccurredAt =
-                        match.FinishedAt.Value
+                    RoutingKey = "match.finished",
+                    Payload = JsonSerializer.Serialize(finishedEvent),
+                    OccurredAt = match.FinishedAt.Value
                 });
 
-            await db.SaveChangesAsync(
-                cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
 
             await _hub.Clients
-                .Group(
-                    MatchHub.GroupName(
-                        match.Id))
+                .Group(MatchHub.GroupName(match.Id))
                 .SendAsync(
                     "MatchUpdated",
                     match.Id,

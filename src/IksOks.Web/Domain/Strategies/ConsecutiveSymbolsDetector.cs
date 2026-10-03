@@ -67,7 +67,6 @@ internal static class ConsecutiveSymbolsDetector
             (currentRow, currentColumn)))
         {
             count++;
-
             currentRow += rowStep;
             currentColumn += columnStep;
         }

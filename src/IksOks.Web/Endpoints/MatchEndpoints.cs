@@ -28,7 +28,7 @@ public static class MatchEndpoints
 
         group.MapPost("/", CreateMatchAsync);
         group.MapPost("/{matchId:guid}/join", JoinMatchAsync);
-        group.MapPost("/join-private",JoinPrivateMatchAsync);
+        group.MapPost("/join-private", JoinPrivateMatchAsync);
         group.MapPost("/{matchId:guid}/moves", MakeMoveAsync);
         group.MapPost("/{matchId:guid}/pause-request", RequestPauseAsync);
         group.MapPost("/{matchId:guid}/pause", PauseMatchAsync);
@@ -149,7 +149,7 @@ public static class MatchEndpoints
     {
         var matches = await db.Matches
             .AsNoTracking()
-            .Where(match =>match.Status ==
+            .Where(match => match.Status ==
             MatchStatus.WaitingForOpponent &&
                 match.Visibility ==
                 MatchVisibility.Public)
@@ -173,7 +173,6 @@ public static class MatchEndpoints
 
         return Results.Ok(matches);
     }
-
 
     private static MatchResponse ToResponse(
         GameMatch match,
@@ -322,12 +321,12 @@ public static class MatchEndpoints
     }
 
     private static async Task<IResult> JoinPrivateMatchAsync(
-    JoinPrivateMatchRequest request,
-    ClaimsPrincipal principal,
-    IksOksDbContext db,
-    MatchStateFactory stateFactory,
-    IHubContext<MatchHub> hub,
-    CancellationToken cancellationToken)
+        JoinPrivateMatchRequest request,
+        ClaimsPrincipal principal,
+        IksOksDbContext db,
+        MatchStateFactory stateFactory,
+        IHubContext<MatchHub> hub,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -340,10 +339,9 @@ public static class MatchEndpoints
             return Results.Unauthorized();
         }
 
-        var joinCode =
-            request.JoinCode
-                .Trim()
-                .ToUpperInvariant();
+        var joinCode = request.JoinCode
+                        .Trim()
+                        .ToUpperInvariant();
 
         if (string.IsNullOrWhiteSpace(joinCode))
         {
@@ -366,8 +364,7 @@ public static class MatchEndpoints
         {
             return Results.NotFound(new
             {
-                error =
-                    "Private match was not found."
+                error = "Private match was not found."
             });
         }
 
@@ -375,25 +372,21 @@ public static class MatchEndpoints
         {
             return Results.BadRequest(new
             {
-                error =
-                    "You cannot join your own match."
+                error = "You cannot join your own match."
             });
         }
 
-        var state =
-            stateFactory.GetState(match.Status);
+        var state = stateFactory.GetState(match.Status);
 
         if (!state.CanJoin(match))
         {
             return Results.Conflict(new
             {
-                error =
-                    "Match is no longer available."
+                error = "Match is no longer available."
             });
         }
 
-        var nextStatus =
-            state.OnOpponentJoined();
+        var nextStatus = state.OnOpponentJoined();
 
         var firstTurnDeadline =
             DateTimeOffset.UtcNow.AddSeconds(
@@ -423,8 +416,7 @@ public static class MatchEndpoints
         {
             return Results.Conflict(new
             {
-                error =
-                    "Match is no longer available."
+                error = "Match is no longer available."
             });
         }
 
@@ -465,10 +457,10 @@ public static class MatchEndpoints
     }
 
     private static async Task<IResult> GetMatchAsync(
-    Guid matchId,
-    ClaimsPrincipal principal,
-    IksOksDbContext db,
-    CancellationToken cancellationToken)
+        Guid matchId,
+        ClaimsPrincipal principal,
+        IksOksDbContext db,
+        CancellationToken cancellationToken)
     {
         var match = await db.Matches
             .AsNoTracking()
@@ -526,12 +518,12 @@ public static class MatchEndpoints
     }
 
     private static async Task<IResult> SurrenderMatchAsync(
-    Guid matchId,
-    ClaimsPrincipal principal,
-    IksOksDbContext db,
-    MatchOperationLock matchOperationLock,
-    IHubContext<MatchHub> hub,
-    CancellationToken cancellationToken)
+        Guid matchId,
+        ClaimsPrincipal principal,
+        IksOksDbContext db,
+        MatchOperationLock matchOperationLock,
+        IHubContext<MatchHub> hub,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -568,8 +560,7 @@ public static class MatchEndpoints
         {
             return Results.Conflict(new
             {
-                error =
-                    "Only an active match can be surrendered."
+                error = "Only an active match can be surrendered."
             });
         }
 
@@ -577,55 +568,38 @@ public static class MatchEndpoints
         {
             return Results.Conflict(new
             {
-                error =
-                    "The match does not have an opponent."
+                error = "The match does not have an opponent."
             });
         }
 
-        var isOwner =
-            match.OwnerUserId == userId;
+        var isOwner = match.OwnerUserId == userId;
 
-        var isOpponent =
-            match.OpponentUserId == userId;
+        var isOpponent = match.OpponentUserId == userId;
 
         if (!isOwner && !isOpponent)
         {
             return Results.Forbid();
         }
 
-        var opponentUserId =
-            match.OpponentUserId.Value;
+        var opponentUserId = match.OpponentUserId.Value;
 
-        var winnerUserId =
-            isOwner
+        var winnerUserId = isOwner
                 ? opponentUserId
                 : match.OwnerUserId;
 
-        var finishedAt =
-            DateTimeOffset.UtcNow;
+        var finishedAt = DateTimeOffset.UtcNow;
 
-        match.Status =
-            MatchStatus.Finished;
-
-        match.WinnerUserId =
-            winnerUserId;
-
-        match.FinishedAt =
-            finishedAt;
-
+        match.Status = MatchStatus.Finished;
+        match.WinnerUserId = winnerUserId;
+        match.FinishedAt = finishedAt;
         match.TurnDeadlineAt = null;
-
-        match.PausedTurnSecondsRemaining =
-            null;
-
+        match.PausedTurnSecondsRemaining = null;
         match.PauseRequestedByUserId = null;
         match.PauseRequestedAt = null;
-
         match.ResumeRequestedByUserId = null;
         match.ResumeRequestedAt = null;
 
-        var eventId =
-            Guid.NewGuid();
+        var eventId = Guid.NewGuid();
 
         var finishedEvent =
             new MatchFinishedEvent(
@@ -643,17 +617,12 @@ public static class MatchEndpoints
             new OutboxMessage
             {
                 Id = eventId,
-                RoutingKey =
-                    "match.finished",
-                Payload =
-                    JsonSerializer.Serialize(
-                        finishedEvent),
-                OccurredAt =
-                    finishedAt
+                RoutingKey = "match.finished",
+                Payload = JsonSerializer.Serialize(finishedEvent),
+                OccurredAt = finishedAt
             });
 
-        await db.SaveChangesAsync(
-            cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
 
         await hub.Clients
             .Group(
@@ -672,8 +641,7 @@ public static class MatchEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult>
-    CancelWaitingMatchAsync(
+    private static async Task<IResult> CancelWaitingMatchAsync(
         Guid matchId,
         ClaimsPrincipal principal,
         IksOksDbContext db,
@@ -717,8 +685,7 @@ public static class MatchEndpoints
         {
             return Results.Conflict(new
             {
-                error =
-                    "The match is no longer waiting for an opponent."
+                error = "The match is no longer waiting for an opponent."
             });
         }
 
@@ -737,8 +704,7 @@ public static class MatchEndpoints
         {
             return Results.Conflict(new
             {
-                error =
-                    "The match is no longer available for cancellation."
+                error = "The match is no longer available for cancellation."
             });
         }
 
@@ -750,14 +716,14 @@ public static class MatchEndpoints
     }
 
     private static async Task<IResult> MakeMoveAsync(
-    Guid matchId,
-    MakeMoveRequest request,
-    ClaimsPrincipal principal,
-    ICommandHandler<
-        MakeMoveCommand,
-        MakeMoveCommandResult> handler,
-    IHubContext<MatchHub> hub,
-    CancellationToken cancellationToken)
+        Guid matchId,
+        MakeMoveRequest request,
+        ClaimsPrincipal principal,
+        ICommandHandler<
+            MakeMoveCommand,
+            MakeMoveCommandResult> handler,
+        IHubContext<MatchHub> hub,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -770,17 +736,15 @@ public static class MatchEndpoints
             return Results.Unauthorized();
         }
 
-        var command =
-            new MakeMoveCommand(
-                matchId,
-                userId,
-                request.Row,
-                request.Column);
+        var command = new MakeMoveCommand(
+                        matchId,
+                        userId,
+                        request.Row,
+                        request.Column);
 
-        var result =
-            await handler.HandleAsync(
-                command,
-                cancellationToken);
+        var result = await handler.HandleAsync(
+                        command,
+                        cancellationToken);
 
         if (!result.IsSuccess)
         {
@@ -789,15 +753,13 @@ public static class MatchEndpoints
                 MakeMoveFailure.MatchNotFound =>
                     Results.NotFound(new
                     {
-                        error =
-                            "Match was not found."
+                        error = "Match was not found."
                     }),
 
                 MakeMoveFailure.MatchNotInProgress =>
                     Results.Conflict(new
                     {
-                        error =
-                            "Match is not in progress."
+                        error = "Match is not in progress."
                     }),
 
                 MakeMoveFailure.Forbidden =>
@@ -806,36 +768,31 @@ public static class MatchEndpoints
                 MakeMoveFailure.OutsideBoard =>
                     Results.BadRequest(new
                     {
-                        error =
-                            "Move is outside of the board."
+                        error = "Move is outside of the board."
                     }),
 
                 MakeMoveFailure.Occupied =>
                     Results.Conflict(new
                     {
-                        error =
-                            "Field is already occupied."
+                        error = "Field is already occupied."
                     }),
 
                 MakeMoveFailure.NotYourTurn =>
                     Results.Conflict(new
                     {
-                        error =
-                            "It is not your turn."
+                        error = "It is not your turn."
                     }),
 
                 MakeMoveFailure.TurnExpired =>
                     Results.Conflict(new
                     {
-                        error =
-                            "Turn time has expired."
+                        error = "Turn time has expired."
                     }),
 
                 _ =>
                     Results.Conflict(new
                     {
-                        error =
-                            "Move could not be completed."
+                        error = "Move could not be completed."
                     })
             };
         }
@@ -868,8 +825,7 @@ public static class MatchEndpoints
                 move.CreatedAt));
     }
 
-    private static MatchDetailsResponse ToDetailsResponse(
-    GameMatch match)
+    private static MatchDetailsResponse ToDetailsResponse(GameMatch match)
     {
         Guid? currentTurnUserId = null;
 
@@ -925,9 +881,9 @@ public static class MatchEndpoints
     }
 
     private static async Task<IResult> GetLiveMatchesAsync(
-    ClaimsPrincipal principal,
-    IksOksDbContext db,
-    CancellationToken cancellationToken)
+        ClaimsPrincipal principal,
+        IksOksDbContext db,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -971,9 +927,9 @@ public static class MatchEndpoints
     }
 
     private static async Task<IResult> GetMyActiveMatchesAsync(
-    ClaimsPrincipal principal,
-    IksOksDbContext db,
-    CancellationToken cancellationToken)
+        ClaimsPrincipal principal,
+        IksOksDbContext db,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -1021,9 +977,9 @@ public static class MatchEndpoints
         return Results.Ok(matches);
     }
     private static async Task<IResult> GetMyMatchHistoryAsync(
-    ClaimsPrincipal principal,
-    IksOksDbContext db,
-    CancellationToken cancellationToken)
+        ClaimsPrincipal principal,
+        IksOksDbContext db,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -1069,9 +1025,9 @@ public static class MatchEndpoints
     }
 
     private static async Task NotifyMatchChangedAsync(
-    Guid matchId,
-    IHubContext<MatchHub> hub,
-    CancellationToken cancellationToken)
+        Guid matchId,
+        IHubContext<MatchHub> hub,
+        CancellationToken cancellationToken)
     {
         await hub.Clients
             .Group(MatchHub.GroupName(matchId))
@@ -1087,7 +1043,7 @@ public static class MatchEndpoints
     }
 
     private static IResult ToMatchControlFailureResult(
-    MatchControlFailure? failure)
+        MatchControlFailure? failure)
     {
         return failure switch
         {
@@ -1104,35 +1060,32 @@ public static class MatchEndpoints
                 .PauseRequestAlreadyExists =>
                 Results.Conflict(new
                 {
-                    error =
-                        "A pause request already exists."
+                    error = "A pause request already exists."
                 }),
 
             MatchControlFailure
                 .PauseRequestNotFound =>
                 Results.Conflict(new
                 {
-                    error =
-                        "There is no pause request."
+                    error = "There is no pause request."
                 }),
 
             _ =>
                 Results.Conflict(new
                 {
-                    error =
-                        "This action is not allowed in the current match state."
+                    error = "This action is not allowed in the current match state."
                 })
         };
     }
 
     private static async Task<IResult> RequestPauseAsync(
-    Guid matchId,
-    ClaimsPrincipal principal,
-    ICommandHandler<
-        RequestPauseCommand,
-        MatchControlCommandResult> handler,
-    IHubContext<MatchHub> hub,
-    CancellationToken cancellationToken)
+        Guid matchId,
+        ClaimsPrincipal principal,
+        ICommandHandler<
+            RequestPauseCommand,
+            MatchControlCommandResult> handler,
+        IHubContext<MatchHub> hub,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -1154,8 +1107,7 @@ public static class MatchEndpoints
 
         if (!result.IsSuccess)
         {
-            return ToMatchControlFailureResult(
-                result.Failure);
+            return ToMatchControlFailureResult(result.Failure);
         }
 
         await NotifyMatchChangedAsync(
@@ -1166,15 +1118,14 @@ public static class MatchEndpoints
         return Results.NoContent();
     }
 
-
     private static async Task<IResult> PauseMatchAsync(
-    Guid matchId,
-    ClaimsPrincipal principal,
-    ICommandHandler<
-        PauseMatchCommand,
-        MatchControlCommandResult> handler,
-    IHubContext<MatchHub> hub,
-    CancellationToken cancellationToken)
+        Guid matchId,
+        ClaimsPrincipal principal,
+        ICommandHandler<
+            PauseMatchCommand,
+            MatchControlCommandResult> handler,
+        IHubContext<MatchHub> hub,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -1196,8 +1147,7 @@ public static class MatchEndpoints
 
         if (!result.IsSuccess)
         {
-            return ToMatchControlFailureResult(
-                result.Failure);
+            return ToMatchControlFailureResult(result.Failure);
         }
 
         await NotifyMatchChangedAsync(
@@ -1209,13 +1159,13 @@ public static class MatchEndpoints
     }
 
     private static async Task<IResult> RejectPauseRequestAsync(
-    Guid matchId,
-    ClaimsPrincipal principal,
-    ICommandHandler<
-        RejectPauseRequestCommand,
-        MatchControlCommandResult> handler,
-    IHubContext<MatchHub> hub,
-    CancellationToken cancellationToken)
+        Guid matchId,
+        ClaimsPrincipal principal,
+        ICommandHandler<
+            RejectPauseRequestCommand,
+            MatchControlCommandResult> handler,
+        IHubContext<MatchHub> hub,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -1237,8 +1187,7 @@ public static class MatchEndpoints
 
         if (!result.IsSuccess)
         {
-            return ToMatchControlFailureResult(
-                result.Failure);
+            return ToMatchControlFailureResult(result.Failure);
         }
 
         await NotifyMatchChangedAsync(
@@ -1249,13 +1198,13 @@ public static class MatchEndpoints
         return Results.NoContent();
     }
     private static async Task<IResult> ResumeMatchAsync(
-    Guid matchId,
-    ClaimsPrincipal principal,
-    ICommandHandler<
-        ResumeMatchCommand,
-        MatchControlCommandResult> handler,
-    IHubContext<MatchHub> hub,
-    CancellationToken cancellationToken)
+        Guid matchId,
+        ClaimsPrincipal principal,
+        ICommandHandler<
+            ResumeMatchCommand,
+            MatchControlCommandResult> handler,
+        IHubContext<MatchHub> hub,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -1277,8 +1226,7 @@ public static class MatchEndpoints
 
         if (!result.IsSuccess)
         {
-            return ToMatchControlFailureResult(
-                result.Failure);
+            return ToMatchControlFailureResult(result.Failure);
         }
 
         await NotifyMatchChangedAsync(
@@ -1290,13 +1238,13 @@ public static class MatchEndpoints
     }
 
     private static async Task<IResult> RequestResumeAsync(
-    Guid matchId,
-    ClaimsPrincipal principal,
-    ICommandHandler<
-        RequestResumeCommand,
-        MatchControlCommandResult> handler,
-    IHubContext<MatchHub> hub,
-    CancellationToken cancellationToken)
+        Guid matchId,
+        ClaimsPrincipal principal,
+        ICommandHandler<
+            RequestResumeCommand,
+            MatchControlCommandResult> handler,
+        IHubContext<MatchHub> hub,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -1317,8 +1265,7 @@ public static class MatchEndpoints
 
         if (!result.IsSuccess)
         {
-            return ToMatchControlFailureResult(
-                result.Failure);
+            return ToMatchControlFailureResult(result.Failure);
         }
 
         await NotifyMatchChangedAsync(
@@ -1330,13 +1277,13 @@ public static class MatchEndpoints
     }
 
     private static async Task<IResult> RejectResumeRequestAsync(
-    Guid matchId,
-    ClaimsPrincipal principal,
-    ICommandHandler<
-        RejectResumeRequestCommand,
-        MatchControlCommandResult> handler,
-    IHubContext<MatchHub> hub,
-    CancellationToken cancellationToken)
+        Guid matchId,
+        ClaimsPrincipal principal,
+        ICommandHandler<
+            RejectResumeRequestCommand,
+            MatchControlCommandResult> handler,
+        IHubContext<MatchHub> hub,
+        CancellationToken cancellationToken)
     {
         var userIdValue = principal
             .FindFirst(ClaimTypes.NameIdentifier)?
@@ -1357,8 +1304,7 @@ public static class MatchEndpoints
 
         if (!result.IsSuccess)
         {
-            return ToMatchControlFailureResult(
-                result.Failure);
+            return ToMatchControlFailureResult(result.Failure);
         }
 
         await NotifyMatchChangedAsync(
