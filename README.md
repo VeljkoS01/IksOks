@@ -338,7 +338,7 @@ docs/uml/architecture.puml
 
 ## Preporučeni redosled pokretanja nakon kloniranja
 
-git clone <repository-url>
+git clone https://github.com/VeljkoS01/IksOks
 
 cd IksOks
 
